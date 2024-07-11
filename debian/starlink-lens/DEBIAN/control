@@ -1,0 +1,32 @@
+Package: starlink-lens
+Version: 0.1-1
+Section: base
+Priority: optional
+Architecture: all
+Build-Depends:
+    build-essential,
+    golang,
+    git,
+    tar,
+    unzip
+
+Depends: 
+    bash, 
+    coreutils, 
+    wget, 
+    sudo, 
+    tree, 
+    git, 
+    iputils-ping, 
+    mtr, 
+    curl, 
+    traceroute,
+    zstd, 
+    python3, 
+    python3-venv,
+    sshpass,
+    rsync
+
+Replaces: inetutils-ping
+Maintainer: clarkzjw <deb@jinwei.me>
+Description: Starlink measurement package

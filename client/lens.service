@@ -1,0 +1,13 @@
+[Unit]
+Description=Starlink-LENS measurement
+
+[Service]
+Type=simple
+User=lens
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory=/opt/LENS/client
+ExecStart=bash /opt/LENS/client/test.sh
+
+[Install]
+WantedBy=default.target
