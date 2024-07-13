@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,14 +19,18 @@ import (
 )
 
 var (
-	GW4                        string
-	GW6                        string
-	DURATION                   string
-	INTERVAL                   string
-	IFACE                      string
-	COUNT                      int
-	ACTIVE                     bool
-	IPv6GWHop                  string
+	GW4          string
+	GW6          string
+	DURATION     string
+	INTERVAL     string
+	INTERVAL_SEC float64
+	IFACE        string
+	COUNT        int
+	ACTIVE       bool
+	IPv6GWHop    string
+	PING_CRON    string
+
+	PoP                        string
 	defaultIPv6GWHop           = "2"
 	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
@@ -56,10 +61,23 @@ func getConfigFromEnv() {
 	if IPv6GWHop, ok = os.LookupEnv("IPv6GWHop"); !ok {
 		IPv6GWHop = defaultIPv6GWHop
 	}
+	if PING_CRON, ok = os.LookupEnv("PING_CRON"); !ok {
+		PING_CRON = "0 * * * *"
+	}
 
 	duration, _ := time.ParseDuration(DURATION)
 	interval, _ := time.ParseDuration(INTERVAL)
 	COUNT = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
+	INTERVAL_SEC = interval.Seconds()
+
+	fmt.Printf("GW4: %s\n", GW4)
+	fmt.Printf("GW6: %s\n", GW6)
+	fmt.Printf("DURATION: %s\n", DURATION)
+	fmt.Printf("INTERVAL: %s\n", INTERVAL)
+	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
+	fmt.Printf("IFACE: %s\n", IFACE)
+	fmt.Printf("COUNT: %d\n", COUNT)
+	fmt.Println("PoP:", PoP)
 }
 
 func getExternalIP(IPVersion int) string {
@@ -71,6 +89,29 @@ func getExternalIP(IPVersion int) string {
 		log.Panic(err)
 	}
 	return strings.Trim(string(output), "\n")
+}
+
+func getReverseDNS(ip string) string {
+	cmd := exec.Command("dig", "+short", "-x", ip)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Panic(err)
+	}
+	return strings.Trim(string(output), "\n")
+}
+
+func getStarlinkPoP(rdns string) string {
+	// rdns: customer.sttlwax1.pop.starlinkisp.net.
+	// PoP: sttlwax1
+
+	regex := `^customer\.(?P<pop>[a-z0-9]+)\.pop\.starlinkisp\.net\.$`
+	re := regexp.MustCompile(regex)
+	match := re.FindStringSubmatch(rdns)
+	if len(match) == 0 {
+		return ""
+	}
+	PoP = match[1]
+	return PoP
 }
 
 func IPExist(ip string) bool {
@@ -116,7 +157,7 @@ func getStarlinkIPv6ActiveGateway() string {
 	fmt.Println("Trying traceroute")
 
 	for {
-		cmd := exec.Command("traceroute", "-6", "-i", IFACE, "www.google.com", "-n", "-m", IPv6GWHop, "-f", IPv6GWHop, "-q", "1")
+		cmd := exec.Command("traceroute", "-6", "-i", IFACE, "ipv6.google.com", "-n", "-m", IPv6GWHop, "-f", IPv6GWHop, "-q", "1")
 		tracerouteResult := ""
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -139,26 +180,33 @@ func getGateway() string {
 		return defaultIPv6InactiveGateway
 	}
 	// Active dish, probe IPv6 active gateway through mtr or traceroute
-	external_ip := getExternalIP(6)
-	if IPExist(external_ip) {
+	external_ip6 := getExternalIP(6)
+	external_ip4 := getExternalIP(4)
+	if IPExist(external_ip6) {
+		getStarlinkPoP(getReverseDNS(external_ip6))
 		return getStarlinkIPv6ActiveGateway()
-	} else if net.ParseIP(external_ip).To4() != nil {
+	} else if net.ParseIP(external_ip4).To4() != nil {
+		getStarlinkPoP(getReverseDNS(external_ip4))
 		return GW4
 	}
 	log.Fatal("GW not detected")
 	return ""
 }
 
-// COUNT = int(parse_delta(DURATION).seconds / (parse_delta(INTERVAL).microseconds/1000.0/1000.0))
-func icmp(target, iface string, interval float64) {
+func getTimeString() string {
+	return time.Now().UTC().Format("2006-01-02-15-04-05")
+}
+
+func icmp_ping(target string, interval float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ping", "-D", "-c", "100", target)
+	cmd := exec.CommandContext(ctx, "ping", "-D", "-c", fmt.Sprintf("%d", COUNT), "-i", fmt.Sprintf("%.2f", interval), "-I", IFACE, target)
 
 	var stdBuffer bytes.Buffer
-	file := "ping.log"
-	f, err := os.Create(file)
+	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, getTimeString())
+
+	f, err := os.Create(filename)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -176,7 +224,19 @@ func icmp(target, iface string, interval float64) {
 	log.Println(stdBuffer.String())
 }
 
+func checkInstalled() {
+	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "irtt"}
+	for _, c := range cmds {
+		if _, err := exec.LookPath(c); err != nil {
+			if _, err := os.Stat(c); err != nil {
+				log.Fatalf("%s is not installed", c)
+			}
+		}
+	}
+}
+
 func main() {
+	checkInstalled()
 	getConfigFromEnv()
 
 	s, err := gocron.NewScheduler()
@@ -187,20 +247,24 @@ func main() {
 
 	_, err = s.NewJob(
 		gocron.CronJob(
-			"* * * * *",
+			PING_CRON,
 			false,
 		),
 		gocron.NewTask(
-			icmp,
-			"1.1.1.1",
-			"en0",
-			0.01,
+			icmp_ping,
+			getGateway(),
+			INTERVAL_SEC,
 		),
 	)
 	if err != nil {
 		fmt.Println("Error creating job")
 	}
+
 	s.Start()
+
+	for _, j := range s.Jobs() {
+		fmt.Println(j.NextRun())
+	}
 
 	select {}
 }
