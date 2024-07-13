@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,18 +21,29 @@ import (
 )
 
 var (
-	GW4          string
-	GW6          string
-	DURATION     string
-	INTERVAL     string
-	INTERVAL_SEC float64
-	IFACE        string
-	COUNT        int
-	ACTIVE       bool
-	IPv6GWHop    string
-	PING_CRON    string
+	GW4            string
+	GW6            string
+	DURATION       string
+	INTERVAL       string
+	INTERVAL_SEC   float64
+	IFACE          string
+	COUNT          int
+	ACTIVE         bool
+	IPv6GWHop      string
+	CRON           string
+	DATA_DIR       string
+	IRTT_HOST_PORT string
+	LOCAL_IP       string
 
-	PoP                        string
+	duration     time.Duration
+	external_ip4 string
+	external_ip6 string
+	PoP          string
+	IPVersion    int
+
+	ENABLE_IRTT  = false
+	ENABLE_FLENT = false
+
 	defaultIPv6GWHop           = "2"
 	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
@@ -75,6 +87,12 @@ func IPExist(ip string) bool {
 	return false
 }
 
+func checkDirectory() string {
+	today := time.Now().UTC().Format("2006-01-02")
+	os.MkdirAll(path.Join("data", today), os.ModePerm)
+	return today
+}
+
 func getConfigFromEnv() {
 	var ok bool
 	if GW4, ok = os.LookupEnv("GW4"); !ok {
@@ -89,21 +107,30 @@ func getConfigFromEnv() {
 	if INTERVAL, ok = os.LookupEnv("INTERVAL"); !ok {
 		INTERVAL = "10ms"
 	}
-	if _ACTIVE, ok := os.LookupEnv("ACTIVE"); !ok {
-		log.Fatal("Dish status ACTIVE is not set")
-	} else {
+	if _ACTIVE, ok := os.LookupEnv("ACTIVE"); ok {
 		ACTIVE, _ = strconv.ParseBool(_ACTIVE)
 	}
 	if IFACE, ok = os.LookupEnv("IFACE"); !ok {
-		log.Fatal("IFACE is not set")
+		IFACE = ""
 	}
 	if IPv6GWHop, ok = os.LookupEnv("IPv6GWHop"); !ok {
 		IPv6GWHop = defaultIPv6GWHop
 	}
-	if PING_CRON, ok = os.LookupEnv("PING_CRON"); !ok {
-		PING_CRON = "0 * * * *"
+	if CRON, ok = os.LookupEnv("CRON"); !ok {
+		CRON = "0 * * * *"
 	}
-
+	if DATA_DIR, ok = os.LookupEnv("DATA_DIR"); !ok {
+		DATA_DIR = "data"
+	}
+	if _ENABLE_IRTT, ok := os.LookupEnv("ENABLE_IRTT"); ok {
+		ENABLE_IRTT, _ = strconv.ParseBool(_ENABLE_IRTT)
+	}
+	if IRTT_HOST_PORT, ok = os.LookupEnv("IRTT_HOST_PORT"); !ok {
+		IRTT_HOST_PORT = ""
+	}
+	if LOCAL_IP, ok = os.LookupEnv("LOCAL_IP"); !ok {
+		LOCAL_IP = ""
+	}
 }
 
 func getConfigFromFile() {
@@ -120,7 +147,11 @@ func getConfigFromFile() {
 	IFACE = cfg.Section("").Key("IFACE").String()
 	ACTIVE, _ = cfg.Section("").Key("ACTIVE").Bool()
 	IPv6GWHop = cfg.Section("").Key("IPv6GWHop").String()
-	PING_CRON = cfg.Section("").Key("PING_CRON").String()
+	CRON = cfg.Section("").Key("CRON").String()
+	DATA_DIR = cfg.Section("").Key("DATA_DIR").String()
+	ENABLE_IRTT, _ = cfg.Section("").Key("ENABLE_IRTT").Bool()
+	IRTT_HOST_PORT = cfg.Section("").Key("IRTT_HOST_PORT").String()
+	LOCAL_IP = cfg.Section("").Key("LOCAL_IP").String()
 }
 
 func getConfig() {
@@ -130,13 +161,28 @@ func getConfig() {
 		getConfigFromEnv()
 	}
 
-	duration, _ := time.ParseDuration(DURATION)
+	if IFACE == "" {
+		log.Fatal("IFACE is not set")
+	}
+
+	if ENABLE_IRTT && IRTT_HOST_PORT == "" {
+		log.Fatal("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
+	}
+
+	GW := getGateway()
+	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {
+		log.Fatal("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
+	}
+
+	duration, _ = time.ParseDuration(DURATION)
 	interval, _ := time.ParseDuration(INTERVAL)
 	COUNT = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
 	INTERVAL_SEC = interval.Seconds()
 
 	fmt.Printf("GW4: %s\n", GW4)
 	fmt.Printf("GW6: %s\n", GW6)
+	fmt.Printf("GW: %s\n", GW)
+
 	fmt.Printf("DURATION: %s\n", DURATION)
 	fmt.Printf("INTERVAL: %s\n", INTERVAL)
 	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
@@ -222,13 +268,15 @@ func getGateway() string {
 		return defaultIPv6InactiveGateway
 	}
 	// Active dish, probe IPv6 active gateway through mtr or traceroute
-	external_ip6 := getExternalIP(6)
-	external_ip4 := getExternalIP(4)
+	external_ip6 = getExternalIP(6)
+	external_ip4 = getExternalIP(4)
 	if IPExist(external_ip6) {
 		getStarlinkPoP(getReverseDNS(external_ip6))
+		IPVersion = 6
 		return getStarlinkIPv6ActiveGateway()
 	} else if net.ParseIP(external_ip4).To4() != nil {
 		getStarlinkPoP(getReverseDNS(external_ip4))
+		IPVersion = 4
 		return GW4
 	}
 	log.Fatal("GW not detected")
@@ -236,13 +284,15 @@ func getGateway() string {
 }
 
 func icmp_ping(target string, interval float64) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
+
+	today := checkDirectory()
 
 	cmd := exec.CommandContext(ctx, "ping", "-D", "-c", fmt.Sprintf("%d", COUNT), "-i", fmt.Sprintf("%.2f", interval), "-I", IFACE, target)
 
 	var stdBuffer bytes.Buffer
-	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, getTimeString())
+	filename := path.Join("data", today, fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, getTimeString()))
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -258,8 +308,28 @@ func icmp_ping(target string, interval float64) {
 	if err := cmd.Run(); err != nil {
 		log.Panic(err)
 	}
+}
 
-	log.Println(stdBuffer.String())
+func irtt_ping() {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+
+	today := checkDirectory()
+
+	filename := path.Join("data", today, fmt.Sprintf("irtt-%s-%s-%s-%s.json", PoP, INTERVAL, DURATION, getTimeString()))
+
+	var local string
+	if IPVersion == 6 {
+		local = fmt.Sprintf("--local=[%s]", external_ip6)
+	} else {
+		local = fmt.Sprintf("--local=%s", LOCAL_IP)
+	}
+
+	cmd := exec.CommandContext(ctx, "irtt", "client", fmt.Sprintf("-%d", IPVersion), "-Q", "-i", INTERVAL, "-d", DURATION, local, IRTT_HOST_PORT, "-o", filename)
+
+	if err := cmd.Run(); err != nil {
+		log.Panic(err)
+	}
 }
 
 func main() {
@@ -275,7 +345,7 @@ func main() {
 
 	_, err = s.NewJob(
 		gocron.CronJob(
-			PING_CRON,
+			CRON,
 			false,
 		),
 		gocron.NewTask(
@@ -285,7 +355,20 @@ func main() {
 		),
 	)
 	if err != nil {
-		log.Fatal("Error creating job: ", err)
+		log.Fatal("Error creating icmp_ping job: ", err)
+	}
+
+	_, err = s.NewJob(
+		gocron.CronJob(
+			CRON,
+			false,
+		),
+		gocron.NewTask(
+			irtt_ping,
+		),
+	)
+	if err != nil {
+		log.Fatal("Error creating irtt_ping job: ", err)
 	}
 
 	s.Start()
