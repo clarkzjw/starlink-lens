@@ -1,0 +1,22 @@
+--verbose
+-s dir -t deb
+-p starlink-lens-0.1.0-1-any.deb
+--name starlink-lens
+--license gpl3
+--version 0.1.0
+--architecture all
+--depends bash
+--depends coreutils
+--depends wget
+--depends sudo
+--depends tree
+--depends git
+--depends iputils-ping
+--depends mtr
+--depends curl
+--depends traceroute
+--depends zstd
+--depends sshpass
+--depends rsync
+--maintainer "clarkzjw <deb@jinwei.me>"
+lens=/usr/bin/lens

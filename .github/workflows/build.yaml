@@ -1,16 +1,43 @@
-name: ci
+name: Create .deb
+
+permissions:
+  contents: write
 
 on:
   push:
     branches:
       - "master"
+    tags:
+      - 'v*'
 
 jobs:
-  base:
+  Create_Packages:
+    name: Create Package
     runs-on: ubuntu-24.04
     steps:
-      -
-        name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          path: "REPO"
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.17.0'
+      - run: go version
+
+      - name: Copy script files around to stop .github from being added to the package then build the package
+        run: |
+          gem install fpm
+          cd REPO/cmd/lens
+          go build
+          fpm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: starlink-lens
+          path: REPO/cmd/lens/*.deb
