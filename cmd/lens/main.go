@@ -92,6 +92,14 @@ func checkDirectory() string {
 	return today
 }
 
+func compress(directory, filename string) error {
+	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func getConfigFromEnv() {
 	var ok bool
 	if GW4, ok = os.LookupEnv("GW4"); !ok {
@@ -323,6 +331,10 @@ func icmp_ping(target string, interval float64) {
 	if err := cmd.Run(); err != nil {
 		log.Panic(err)
 	}
+
+	if err := compress(path.Join(DATA_DIR, today), filename); err != nil {
+		log.Println(err)
+	}
 }
 
 func irtt_ping() {
@@ -344,6 +356,10 @@ func irtt_ping() {
 
 	if err := cmd.Run(); err != nil {
 		log.Panic(err)
+	}
+
+	if err := compress(path.Join(DATA_DIR, today), filename); err != nil {
+		log.Println(err)
 	}
 }
 
