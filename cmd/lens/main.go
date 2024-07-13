@@ -72,7 +72,7 @@ func getTimeString() string {
 }
 
 func checkInstalled() {
-	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "irtt"}
+	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl"}
 	for _, c := range cmds {
 		if _, err := exec.LookPath(c); err != nil {
 			if _, err := os.Stat(c); err != nil {
