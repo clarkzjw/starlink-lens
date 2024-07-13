@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -188,7 +187,7 @@ func getConfig() {
 	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
 	fmt.Printf("IFACE: %s\n", IFACE)
 	fmt.Printf("COUNT: %d\n", COUNT)
-	fmt.Println("PoP:", PoP)
+	fmt.Printf("PoP: %s\n\n", PoP)
 }
 
 func getExternalIP(IPVersion int) string {
@@ -203,7 +202,7 @@ func getExternalIP(IPVersion int) string {
 }
 
 func getReverseDNS(ip string) string {
-	cmd := exec.Command("dig", "+short", "-x", ip)
+	cmd := exec.Command("dig", "@1.1.1.1", "+short", "-x", ip)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Panic(err)
@@ -221,8 +220,7 @@ func getStarlinkPoP(rdns string) string {
 	if len(match) == 0 {
 		return ""
 	}
-	PoP = match[1]
-	return PoP
+	return match[1]
 }
 
 func getStarlinkIPv6ActiveGateway() string {
@@ -261,21 +259,39 @@ func getStarlinkIPv6ActiveGateway() string {
 	}
 }
 
+func getInactiveIPv6PoP() string {
+	ifces, _ := net.Interfaces()
+	for _, iface := range ifces {
+		if iface.Name == IFACE {
+			addrs, _ := iface.Addrs()
+			for _, addr := range addrs {
+				ip, _, _ := net.ParseCIDR(addr.String())
+				pop := getStarlinkPoP(getReverseDNS(ip.String()))
+				if pop != "" {
+					return pop
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func getGateway() string {
 	// Inactive dish, return default IPv6 inactive gateway
 	// Router Bypass mode has to be set through the Starlink mobile app
 	if !ACTIVE {
+		PoP = getInactiveIPv6PoP()
 		return defaultIPv6InactiveGateway
 	}
 	// Active dish, probe IPv6 active gateway through mtr or traceroute
 	external_ip6 = getExternalIP(6)
 	external_ip4 = getExternalIP(4)
 	if IPExist(external_ip6) {
-		getStarlinkPoP(getReverseDNS(external_ip6))
+		PoP = getStarlinkPoP(getReverseDNS(external_ip6))
 		IPVersion = 6
 		return getStarlinkIPv6ActiveGateway()
 	} else if net.ParseIP(external_ip4).To4() != nil {
-		getStarlinkPoP(getReverseDNS(external_ip4))
+		PoP = getStarlinkPoP(getReverseDNS(external_ip4))
 		IPVersion = 4
 		return GW4
 	}
@@ -291,7 +307,6 @@ func icmp_ping(target string, interval float64) {
 
 	cmd := exec.CommandContext(ctx, "ping", "-D", "-c", fmt.Sprintf("%d", COUNT), "-i", fmt.Sprintf("%.2f", interval), "-I", IFACE, target)
 
-	var stdBuffer bytes.Buffer
 	filename := path.Join("data", today, fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, getTimeString()))
 
 	f, err := os.Create(filename)
@@ -300,7 +315,7 @@ func icmp_ping(target string, interval float64) {
 	}
 	defer f.Close()
 
-	mw := io.MultiWriter(f, os.Stdout, &stdBuffer)
+	mw := io.MultiWriter(f)
 
 	cmd.Stdout = mw
 	cmd.Stderr = mw
@@ -333,7 +348,6 @@ func irtt_ping() {
 }
 
 func main() {
-
 	checkInstalled()
 	getConfig()
 
@@ -358,23 +372,27 @@ func main() {
 		log.Fatal("Error creating icmp_ping job: ", err)
 	}
 
-	_, err = s.NewJob(
-		gocron.CronJob(
-			CRON,
-			false,
-		),
-		gocron.NewTask(
-			irtt_ping,
-		),
-	)
-	if err != nil {
-		log.Fatal("Error creating irtt_ping job: ", err)
+	if ENABLE_IRTT {
+		_, err = s.NewJob(
+			gocron.CronJob(
+				CRON,
+				false,
+			),
+			gocron.NewTask(
+				irtt_ping,
+			),
+		)
+		if err != nil {
+			log.Fatal("Error creating irtt_ping job: ", err)
+		}
 	}
 
 	s.Start()
 
 	for _, j := range s.Jobs() {
-		fmt.Println(j.NextRun())
+		t, _ := j.NextRun()
+
+		fmt.Printf("[%s] Next run: %s\n", j.Name(), t)
 	}
 
 	select {}
