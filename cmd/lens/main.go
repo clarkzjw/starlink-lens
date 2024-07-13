@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
+	"gopkg.in/ini.v1"
 )
 
 var (
@@ -35,6 +36,44 @@ var (
 	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
 )
+
+type MTRResult struct {
+	Report struct {
+		Hubs []struct {
+			Count int    `json:"count"`
+			Host  string `json:"host"`
+		}
+	}
+}
+
+func getTimeString() string {
+	return time.Now().UTC().Format("2006-01-02-15-04-05")
+}
+
+func checkInstalled() {
+	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "irtt"}
+	for _, c := range cmds {
+		if _, err := exec.LookPath(c); err != nil {
+			if _, err := os.Stat(c); err != nil {
+				log.Fatalf("%s is not installed", c)
+			}
+		}
+	}
+}
+
+func IPExist(ip string) bool {
+	addrs, _ := net.InterfaceAddrs()
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To16() != nil {
+				if ipnet.IP.To16().String() == ip {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
 
 func getConfigFromEnv() {
 	var ok bool
@@ -65,6 +104,32 @@ func getConfigFromEnv() {
 		PING_CRON = "0 * * * *"
 	}
 
+}
+
+func getConfigFromFile() {
+	cfg, err := ini.Load("config.ini")
+	if err != nil {
+		fmt.Printf("Fail to read file: %v", err)
+		os.Exit(1)
+	}
+
+	GW4 = cfg.Section("").Key("GW4").String()
+	GW6 = cfg.Section("").Key("GW6").String()
+	DURATION = cfg.Section("").Key("DURATION").String()
+	INTERVAL = cfg.Section("").Key("INTERVAL").String()
+	IFACE = cfg.Section("").Key("IFACE").String()
+	ACTIVE, _ = cfg.Section("").Key("ACTIVE").Bool()
+	IPv6GWHop = cfg.Section("").Key("IPv6GWHop").String()
+	PING_CRON = cfg.Section("").Key("PING_CRON").String()
+}
+
+func getConfig() {
+	if _, err := os.Stat("config.ini"); err == nil {
+		getConfigFromFile()
+	} else {
+		getConfigFromEnv()
+	}
+
 	duration, _ := time.ParseDuration(DURATION)
 	interval, _ := time.ParseDuration(INTERVAL)
 	COUNT = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
@@ -86,7 +151,7 @@ func getExternalIP(IPVersion int) string {
 	}
 	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ipconfig.io").CombinedOutput()
 	if err != nil {
-		log.Panic(err)
+		log.Panic("get external IP failed: ", err)
 	}
 	return strings.Trim(string(output), "\n")
 }
@@ -112,29 +177,6 @@ func getStarlinkPoP(rdns string) string {
 	}
 	PoP = match[1]
 	return PoP
-}
-
-func IPExist(ip string) bool {
-	addrs, _ := net.InterfaceAddrs()
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To16() != nil {
-				if ipnet.IP.To16().String() == ip {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-type MTRResult struct {
-	Report struct {
-		Hubs []struct {
-			Count int    `json:"count"`
-			Host  string `json:"host"`
-		}
-	}
 }
 
 func getStarlinkIPv6ActiveGateway() string {
@@ -193,10 +235,6 @@ func getGateway() string {
 	return ""
 }
 
-func getTimeString() string {
-	return time.Now().UTC().Format("2006-01-02-15-04-05")
-}
-
 func icmp_ping(target string, interval float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -224,24 +262,14 @@ func icmp_ping(target string, interval float64) {
 	log.Println(stdBuffer.String())
 }
 
-func checkInstalled() {
-	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "irtt"}
-	for _, c := range cmds {
-		if _, err := exec.LookPath(c); err != nil {
-			if _, err := os.Stat(c); err != nil {
-				log.Fatalf("%s is not installed", c)
-			}
-		}
-	}
-}
-
 func main() {
+
 	checkInstalled()
-	getConfigFromEnv()
+	getConfig()
 
 	s, err := gocron.NewScheduler()
 	if err != nil {
-		fmt.Println("Error creating scheduler")
+		log.Fatal("Error creating scheduler: ", err)
 	}
 	defer func() { _ = s.Shutdown() }()
 
@@ -257,7 +285,7 @@ func main() {
 		),
 	)
 	if err != nil {
-		fmt.Println("Error creating job")
+		log.Fatal("Error creating job: ", err)
 	}
 
 	s.Start()
