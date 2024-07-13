@@ -46,6 +46,16 @@ var (
 	defaultIPv6GWHop           = "2"
 	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
+
+	ENABLE_SYNC  = false
+	CLIENT_NAME  string
+	NOTIFY_URL   string
+	SYNC_SERVER  string
+	SYNC_USER    string
+	SYNC_KEY     string
+	SYNC_PATH    string
+	SYNC_CRON    string
+	SSHPASS_PATH string
 )
 
 type MTRResult struct {
@@ -159,6 +169,18 @@ func getConfigFromFile() {
 	ENABLE_IRTT, _ = cfg.Section("").Key("ENABLE_IRTT").Bool()
 	IRTT_HOST_PORT = cfg.Section("").Key("IRTT_HOST_PORT").String()
 	LOCAL_IP = cfg.Section("").Key("LOCAL_IP").String()
+
+	ENABLE_SYNC, _ = cfg.Section("sync").Key("ENABLE_SYNC").Bool()
+	if ENABLE_SYNC {
+		CLIENT_NAME = cfg.Section("sync").Key("CLIENT_NAME").String()
+		NOTIFY_URL = cfg.Section("sync").Key("NOTIFY_URL").String()
+		SYNC_SERVER = cfg.Section("sync").Key("SYNC_SERVER").String()
+		SYNC_USER = cfg.Section("sync").Key("SYNC_USER").String()
+		SYNC_KEY = cfg.Section("sync").Key("SYNC_KEY").String()
+		SYNC_PATH = cfg.Section("sync").Key("SYNC_PATH").String()
+		SYNC_CRON = cfg.Section("sync").Key("SYNC_CRON").String()
+		SSHPASS_PATH = cfg.Section("sync").Key("SSHPASS_PATH").String()
+	}
 }
 
 func getConfig() {
@@ -370,6 +392,33 @@ func irtt_ping() {
 	}
 }
 
+func sync_data() {
+	cmd := exec.Command(SSHPASS_PATH,
+		"-p", SYNC_KEY,
+		"rsync",
+		"-4",
+		"--remove-source-files",
+		"-e", "ssh -o StrictHostKeychecking=no",
+		"--exclude=*.txt",
+		"--exclude=*.json",
+		"-a",
+		"-v",
+		"-z",
+		path.Join(DATA_DIR, "*"),
+		fmt.Sprintf("%s@%s:%s", SYNC_USER, SYNC_SERVER, path.Join(SYNC_PATH, CLIENT_NAME)))
+
+	if err := cmd.Run(); err != nil {
+		log.Println(err)
+	}
+
+	if NOTIFY_URL != "" {
+		cmd := exec.Command("curl", "--retry", "3", "-4", "-X", "GET", NOTIFY_URL)
+		if err := cmd.Run(); err != nil {
+			log.Println(err)
+		}
+	}
+}
+
 func main() {
 	checkInstalled()
 	getConfig()
@@ -407,6 +456,21 @@ func main() {
 		)
 		if err != nil {
 			log.Fatal("Error creating irtt_ping job: ", err)
+		}
+	}
+
+	if ENABLE_SYNC {
+		_, err = s.NewJob(
+			gocron.CronJob(
+				SYNC_CRON,
+				false,
+			),
+			gocron.NewTask(
+				sync_data,
+			),
+		)
+		if err != nil {
+			log.Fatal("Error creating sync_data job: ", err)
 		}
 	}
 
