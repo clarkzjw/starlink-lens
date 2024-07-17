@@ -1,6 +1,6 @@
 module github.com/clarkzjw/starlink-lens
 
-go 1.22.5
+go 1.22.2
 
 require (
 	github.com/go-co-op/gocron/v2 v2.10.0
