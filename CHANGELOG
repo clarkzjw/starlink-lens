@@ -1,0 +1,4 @@
+0.0.5
+
+    - FIX: fix sync_data() failed due to shell escape parsing
+    - ADD: add exec.Command() output to stderr and stdout
