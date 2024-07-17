@@ -104,6 +104,10 @@ func checkDirectory() string {
 
 func compress(directory, filename string) error {
 	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
+	log.Println(cmd.String())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	if err := cmd.Run(); err != nil {
 		return err
 	}
@@ -339,6 +343,7 @@ func icmp_ping(target string, interval float64) {
 
 	go func(ctx context.Context) {
 		cmd := exec.CommandContext(ctx, "ping", "-D", "-c", fmt.Sprintf("%d", COUNT), "-i", fmt.Sprintf("%.2f", interval), "-I", IFACE, target)
+		log.Println(cmd.String())
 
 		f, err := os.Create(filename_full)
 		if err != nil {
@@ -380,6 +385,7 @@ func irtt_ping() {
 		}
 
 		cmd := exec.CommandContext(ctx, "irtt", "client", fmt.Sprintf("-%d", IPVersion), "-Q", "-i", INTERVAL, "-d", DURATION, local, IRTT_HOST_PORT, "-o", filename_full)
+		log.Println(cmd.String())
 
 		if err := cmd.Run(); err != nil {
 			log.Println(err)
@@ -398,7 +404,7 @@ func sync_data() {
 		"rsync",
 		"-4",
 		"--remove-source-files",
-		"-e", "ssh -o StrictHostKeychecking=no",
+		"-e", "'ssh -o StrictHostKeychecking=no'",
 		"--exclude=*.txt",
 		"--exclude=*.json",
 		"-a",
@@ -407,12 +413,22 @@ func sync_data() {
 		path.Join(DATA_DIR, "*"),
 		fmt.Sprintf("%s@%s:%s", SYNC_USER, SYNC_SERVER, path.Join(SYNC_PATH, CLIENT_NAME)))
 
-	if err := cmd.Run(); err != nil {
+	shellCmd := exec.Command("bash", "-c", cmd.String())
+	log.Println(shellCmd.String())
+
+	shellCmd.Stdout = os.Stdout
+	shellCmd.Stderr = os.Stderr
+
+	if err := shellCmd.Run(); err != nil {
 		log.Println(err)
 	}
 
 	if NOTIFY_URL != "" {
 		cmd := exec.Command("curl", "--retry", "3", "-4", "-X", "GET", NOTIFY_URL)
+		log.Println(cmd.String())
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
 		if err := cmd.Run(); err != nil {
 			log.Println(err)
 		}
