@@ -12,7 +12,7 @@ on:
 
 jobs:
   Ubuntu2404:
-    name: Create Package
+    name: Create DEB Package
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
@@ -25,19 +25,29 @@ jobs:
         with:
           ruby-version: '3.3'
 
-      - uses: actions/setup-go@v5
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version: '>=1.17.0'
-      - run: go version
 
-      - name: Copy script files around to stop .github from being added to the package then build the package
+      - name: Verify Go version
+        run: go version
+
+      - name: Build .deb
         run: |
           gem install fpm
           cd REPO/cmd/lens
           CGO_ENABLED=0 go build -ldflags "-s -w"
           fpm
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: starlink-lens
           path: REPO/cmd/lens/*.deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: REPO/cmd/lens/*.deb
