@@ -11,7 +11,7 @@ on:
       - 'v*'
 
 jobs:
-  Create_Packages:
+  Ubuntu2404:
     name: Create Package
     runs-on: ubuntu-24.04
     steps:
@@ -34,7 +34,7 @@ jobs:
         run: |
           gem install fpm
           cd REPO/cmd/lens
-          go build
+          CGO_ENABLED=0 go build -ldflags "-s -w"
           fpm
 
       - uses: actions/upload-artifact@v4
