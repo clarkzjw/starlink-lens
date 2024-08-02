@@ -9,4 +9,4 @@ ppa:
 	dh_make -p lens_0.0.0 --createorig
 	debuild -S -k$DEBSIGN_KEYID
 	cd ..
-	dput ppa:clarkzjw/lens lens_0.0.0-5_source.changes
+	dput ppa:clarkzjw/lens lens_0.0.0-14_source.changes

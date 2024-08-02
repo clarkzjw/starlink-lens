@@ -1,3 +1,9 @@
+lens (0.0.0-14) noble; urgency=medium
+
+  * FIX: Focal will need to use binary released on GitHub
+
+ -- clarkzjw <i@jinwei.me>  Thu, 1 Aug 2024 20:16:00 -0700
+
 lens (0.0.0-5) noble; urgency=medium
 
   * FIX: fix sync_data() failed due to shell escape parsing
