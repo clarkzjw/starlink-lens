@@ -1,16 +1,14 @@
 --verbose
 -s dir -t deb
--p starlink-lens-0.1.0-1-any.deb
+-p starlink-lens-0.1.0-1-amd64.deb
 --name starlink-lens
 --license gpl3
 --version 0.1.0
---architecture all
+--architecture amd64
 --depends bash
 --depends coreutils
 --depends wget
---depends sudo
 --depends tree
---depends git
 --depends iputils-ping
 --depends mtr
 --depends curl
