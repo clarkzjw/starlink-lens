@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-co-op/gocron/v2"
 	"io"
 	"log"
 	"net"
@@ -15,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-co-op/gocron/v2"
 	"gopkg.in/ini.v1"
 )
 
@@ -203,6 +203,9 @@ func getConfig() {
 	}
 
 	GW := getGateway()
+	if GW == "" {
+		log.Fatal("GW not detected")
+	}
 	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {
 		log.Fatal("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
 	}
@@ -285,9 +288,9 @@ func getStarlinkIPv6ActiveGateway() string {
 		}
 		tracerouteResult = string(output)
 		GW := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
-		if GW == "*" {
-			fmt.Println("traceroute failed, try again...")
-			continue
+		GW = strings.Split(GW, " ")[3]
+		if GW == "*" || net.ParseIP(GW).To16() == nil {
+			log.Fatal("traceroute failed")
 		}
 		return GW
 	}
@@ -323,13 +326,16 @@ func getGateway() string {
 	if IPExist(external_ip6) {
 		PoP = getStarlinkPoP(getReverseDNS(external_ip6))
 		IPVersion = 6
+		if GW6 != "fe80::200:5eff:fe00:101" {
+			return GW6
+		}
 		return getStarlinkIPv6ActiveGateway()
 	} else if net.ParseIP(external_ip4).To4() != nil {
 		PoP = getStarlinkPoP(getReverseDNS(external_ip4))
 		IPVersion = 4
 		return GW4
 	}
-	log.Fatal("GW not detected")
+	log.Fatal("GW not detected, get external IP failed")
 	return ""
 }
 
