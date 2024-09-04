@@ -64,7 +64,7 @@ WantedBy=default.target
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable lens.service
-sudo systemctl start lensl.service
+sudo systemctl start lens.service
 ```
 
 ## TODO
