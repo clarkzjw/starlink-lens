@@ -1,5 +1,7 @@
 # Starlink LENS ![Build](https://github.com/clarkzjw/starlink-lens/actions/workflows/build.yaml/badge.svg)
 
+See information about tracerouting Starlink backbone map in the [backbone-map](./backbone-map) directory.
+
 **Work In Progress**
 
 This tool is used to collect Starlink user terminal (UT) to gateway latency data with `ping` and `irtt`, for the [LENS](https://github.com/clarkzjw/LENS) dataset.
