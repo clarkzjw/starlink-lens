@@ -4,6 +4,18 @@
 
 If you have (access to) a Starlink dish, you can help the community identifying the Starlink backbone map topology by running the backbone traceroute scripts.
 
+### Note
+
+If you are running `Tailscale` on the same node which you are going to execute `traceroute`/`tracert`, Tailscale's CGNAT subnet `100.64.0.0/10` is in conflict with Starlink's CGNAT subnet for regular users. Thus, you may notice you cannot ping Starlink's gateway at `100.64.0.1`.
+
+You can disable the behavior via 
+
+```bash
+sudo tailscale up --netfilter-mode=off
+```
+
+or configure iptables accordingly. See [also](https://github.com/tailscale/tailscale/issues/3104).
+
 ### Linux
 
 Ideally, you should have access to a Linux like environment, either it is a Linux machine, or a WSL (Windows Subsystem for Linux) environment.
