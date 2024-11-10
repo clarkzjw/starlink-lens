@@ -1,0 +1,20 @@
+--verbose
+-s dir -t deb
+-p starlink-lens-amd64.deb
+--name starlink-lens
+--license gpl3
+--version 0.1.0
+--architecture x86_64
+--depends bash
+--depends coreutils
+--depends wget
+--depends tree
+--depends iputils-ping
+--depends mtr
+--depends curl
+--depends traceroute
+--depends zstd
+--depends sshpass
+--depends rsync
+--maintainer "clarkzjw <deb@jinwei.me>"
+lens-amd64=/usr/bin/lens

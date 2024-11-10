@@ -37,14 +37,22 @@ jobs:
         run: |
           gem install fpm
           cd REPO/cmd/lens
-          CGO_ENABLED=0 go build -ldflags "-s -w"
-          fpm
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o lens-amd64
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o lens-arm64
+          FPMOPTS="$(cat .fpm-amd64)" fpm
+          FPMOPTS="$(cat .fpm-arm64)" fpm
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: starlink-lens
-          path: REPO/cmd/lens/*.deb
+          name: starlink-lens-amd64
+          path: REPO/cmd/lens/*-amd64.deb
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: starlink-lens-arm64
+          path: REPO/cmd/lens/*-arm64.deb
 
       - name: Release
         uses: softprops/action-gh-release@v1
