@@ -1,6 +1,8 @@
 # Starlink LENS ![Build](https://github.com/clarkzjw/starlink-lens/actions/workflows/build.yaml/badge.svg)
 
-See information about tracerouting Starlink backbone map in the [backbone-map](./backbone-map) directory.
+See information about tracerouting Starlink backbone in the [backbone-map](./backbone-map) directory.
+
+---
 
 **Work In Progress**
 
@@ -8,13 +10,15 @@ This tool is used to collect Starlink user terminal (UT) to gateway latency data
 
 ## Install
 
-* Ubuntu 20.04 and newer: Download the deb package for your architecture from [Releases](https://github.com/clarkzjw/starlink-lens/releases), and install it with `sudo apt install ./starlink-lens-amd64.deb`
+Pre-built binaries are available for Debian-based Linux systems on `x86_64` and `arm64`. However, you can also build from source with `Golang` in the `cmd/lens` directory.
 
-Dependencies installed: https://github.com/clarkzjw/starlink-lens/blob/master/cmd/lens/.fpm#L8-L20
+* Ubuntu 20.04 and newer: Download the pre-built deb package for your architecture from [Releases](https://github.com/clarkzjw/starlink-lens/releases), and install it with `sudo apt install ./starlink-lens-<arch>.deb`
+
+Dependencies installed: https://github.com/clarkzjw/starlink-lens/blob/master/cmd/lens/.fpm-amd64#L8-L18
 
 ## Configuration
 
-`/opt/lens/config.ini`:
+Create a configuration file at `/opt/lens/config.ini` with the following content:
 
 ```ini
 GW4 = "100.64.0.1"
@@ -41,7 +45,12 @@ SYNC_CRON = "30 * * * *"
 SSHPASS_PATH = "sshpass"
 ```
 
-`/usr/lib/systemd/system/lens.service`:
+Note:
+
++ `100.64.0.1` is the default IPv4 gateway for most Starlink users. `fe80::200:5eff:fe00:101` is the ICMP-reachable IPv6 gateway for inactive Starlink users.
++ If you have active Starlink subscription, you can get your Starlink IPv6 gateway by running `mtr -6 ipv6.google.com` and looking for the second hop.
+
+If you want to start the service with systemd, create a systemd service file at `/usr/lib/systemd/system/lens.service`:
 
 ```
 [Unit]
@@ -60,6 +69,8 @@ ExecStart=/usr/bin/lens
 [Install]
 WantedBy=default.target
 ```
+
+Then run the following commands to enable and start the service:
 
 ```bash
 sudo systemctl daemon-reload
