@@ -3,7 +3,7 @@
 -p starlink-lens-arm64.deb
 --name starlink-lens
 --license gpl3
---version 0.1.0
+--version v241110.1
 --architecture aarch64
 --depends bash
 --depends coreutils
