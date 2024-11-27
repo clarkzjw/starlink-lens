@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-co-op/gocron/v2"
 	"io"
 	"log"
 	"net"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-co-op/gocron/v2"
 
 	"gopkg.in/ini.v1"
 )
@@ -233,7 +234,8 @@ func getExternalIP(IPVersion int) string {
 	}
 	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ipconfig.io").CombinedOutput()
 	if err != nil {
-		log.Panic("get external IP failed: ", err)
+		log.Println("get external IP failed: ", err)
+		return ""
 	}
 	return strings.Trim(string(output), "\n")
 }
@@ -242,7 +244,7 @@ func getReverseDNS(ip string) string {
 	cmd := exec.Command("dig", "@1.1.1.1", "+short", "-x", ip)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 	return strings.Trim(string(output), "\n")
 }
@@ -324,6 +326,7 @@ func getGateway() string {
 	external_ip6 = getExternalIP(6)
 	external_ip4 = getExternalIP(4)
 	if IPExist(external_ip6) {
+		log.Println("External IPv6: ", external_ip6)
 		PoP = getStarlinkPoP(getReverseDNS(external_ip6))
 		IPVersion = 6
 		if GW6 != "fe80::200:5eff:fe00:101" {
@@ -331,6 +334,7 @@ func getGateway() string {
 		}
 		return getStarlinkIPv6ActiveGateway()
 	} else if net.ParseIP(external_ip4).To4() != nil {
+		log.Println("External IPv4: ", external_ip4)
 		PoP = getStarlinkPoP(getReverseDNS(external_ip4))
 		IPVersion = 4
 		return GW4
