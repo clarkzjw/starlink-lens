@@ -1,29 +1,54 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/go-co-op/gocron/v2"
 )
 
 func main() {
 	checkInstalled()
-
-	// grpcClient, err := NewGrpcClient(DishAddress)
-	// if err != nil {
-	// 	log.Println("Error creating gRPC client: ", err)
-	// } else {
-	// 	obstructionMap := grpcClient.CollectDishObstructionMap()
-	// 	file := "obstruction_map.png"
-	// 	f, _ := os.Create(file)
-	// 	defer f.Close()
-
-	// 	// save obstructionMap.Data of type []byte to file
-	// 	f.Write(obstructionMap.Data)
-	// }
-
 	GetConfig()
+
+	getObstructionMap := flag.Bool("map", false, "Get obstruction map")
+	flag.Parse()
+
+	if *getObstructionMap {
+		if GRPC_ADDR_PORT == "" {
+			GRPC_ADDR_PORT = defaultDishAddress
+		}
+		grpcClient, err := NewGrpcClient(GRPC_ADDR_PORT)
+		if err != nil {
+			log.Println("Error creating gRPC client: ", err)
+			return
+		} else {
+			obstructionMap := grpcClient.CollectDishObstructionMap()
+			datetime := getTimeString()
+			file := fmt.Sprintf("obstruction-map-%s.png", datetime)
+			f, _ := os.Create(file)
+			defer f.Close()
+			_, err = f.Write(obstructionMap.Data)
+			if err != nil {
+				log.Println("Error writing obstruction map: ", err)
+			}
+			return
+		}
+	}
+	if IFACE == "" {
+		log.Fatal("IFACE is not set")
+	}
+
+	fmt.Printf("GW4: %s\n", GW4)
+	fmt.Printf("GW6: %s\n", GW6)
+	fmt.Printf("DURATION: %s\n", DURATION)
+	fmt.Printf("INTERVAL: %s\n", INTERVAL)
+	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
+	fmt.Printf("IFACE: %s\n", IFACE)
+	fmt.Printf("COUNT: %d\n", COUNT)
+	fmt.Printf("PoP: %s\n\n", PoP)
 
 	s, err := gocron.NewScheduler()
 	if err != nil {

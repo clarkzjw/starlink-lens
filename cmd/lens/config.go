@@ -133,10 +133,6 @@ func GetConfig() {
 		getConfigFromEnv()
 	}
 
-	if IFACE == "" {
-		log.Fatal("IFACE is not set")
-	}
-
 	if ENABLE_IRTT && IRTT_HOST_PORT == "" {
 		log.Fatal("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
 	}
@@ -152,10 +148,6 @@ func GetConfig() {
 		}
 	}
 
-	fmt.Printf("GW4: %s\n", GW4)
-	fmt.Printf("GW6: %s\n", GW6)
-	fmt.Printf("GW: %s\n", GW)
-
 	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {
 		log.Fatal("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
 	}
@@ -164,11 +156,4 @@ func GetConfig() {
 	interval, _ := time.ParseDuration(INTERVAL)
 	COUNT = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
 	INTERVAL_SEC = interval.Seconds()
-
-	fmt.Printf("DURATION: %s\n", DURATION)
-	fmt.Printf("INTERVAL: %s\n", INTERVAL)
-	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
-	fmt.Printf("IFACE: %s\n", IFACE)
-	fmt.Printf("COUNT: %d\n", COUNT)
-	fmt.Printf("PoP: %s\n\n", PoP)
 }
