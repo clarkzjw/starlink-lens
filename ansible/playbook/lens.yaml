@@ -1,0 +1,73 @@
+- name: install common packages
+  hosts: all
+  tasks:
+    - name: Install packages
+      apt:
+        name:
+          - apt-transport-https
+          - build-essential
+          - ca-certificates
+          - lsb-release
+          - net-tools
+          - pkg-config
+          - gnupg2
+          - sudo
+          - htop
+          - curl
+          - wget
+          - zstd
+          - tree
+          - unzip
+          - zip
+          - vim
+          - git
+          - zsh
+          - mtr
+          - traceroute
+          - dnsutils
+          - iputils-ping
+          - vnstat
+          - iproute2
+        update_cache: true
+
+- name: Install lens by apt
+  hosts: all
+  gather_facts: True
+  vars:
+    deb_architecture: {
+      "aarch64": "arm64",
+      "x86_64": "amd64"
+    }
+  tasks:
+  - name: Install lens apt repository
+    block:
+      # - name: Print all available facts
+      #   ansible.builtin.debug:
+      #     var: ansible_facts
+      - name: add apt key
+        ansible.builtin.get_url:
+          url: https://pkg.jinwei.me/clarkzjw-pkg.key
+          dest: /etc/apt/keyrings/clarkzjw-pkg.asc
+
+      - name: install apt repository
+        ansible.builtin.apt_repository:
+          repo: "deb [arch={{ deb_architecture[ansible_architecture] }} signed-by=/etc/apt/keyrings/clarkzjw-pkg.asc] https://pkg.jinwei.me/lens {{ ansible_distribution_release }} main"
+          state: present
+
+      - name: install lens
+        ansible.builtin.apt:
+          pkg:
+          - lens
+          update_cache: yes
+          state: latest
+
+      # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/systemd_service_module.html
+      - name: reload systemd
+        ansible.builtin.systemd:
+          daemon_reload: true
+
+      - name: start lens agent
+        ansible.builtin.systemd:
+          name: lens
+          state: restarted
+          enabled: true
