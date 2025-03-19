@@ -23,11 +23,6 @@ type Exporter struct {
 	CountryCode string
 }
 
-const (
-	DishAddress = "192.168.100.1:9200"
-	grpcTimeout = 5 * time.Second
-)
-
 func NewGrpcClient(address string) (*Exporter, error) {
 	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
