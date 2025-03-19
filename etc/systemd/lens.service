@@ -1,5 +1,5 @@
 [Unit]
-Description=Starlink LENS dataset, clarkzjw at uvic.ca
+Description=Starlink LENS dataset collection, clarkzjw at uvic.ca
 
 [Service]
 Type=simple

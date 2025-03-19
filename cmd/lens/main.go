@@ -99,7 +99,10 @@ func IPExist(ip string) bool {
 
 func checkDirectory() string {
 	today := time.Now().UTC().Format("2006-01-02")
-	os.MkdirAll(path.Join("data", today), os.ModePerm)
+	err := os.MkdirAll(path.Join("data", today), os.ModePerm)
+	if err != nil {
+		log.Println("Error creating directory: ", err)
+	}
 	return today
 }
 
@@ -270,7 +273,10 @@ func getStarlinkIPv6ActiveGateway() string {
 	}
 
 	var mtrOutput MTRResult
-	json.Unmarshal([]byte(string(cmd)), &mtrOutput)
+	err = json.Unmarshal([]byte(string(cmd)), &mtrOutput)
+	if err != nil {
+		log.Println("Error unmarshalling mtr output: ", err)
+	}
 
 	for _, h := range mtrOutput.Report.Hubs {
 		if strconv.Itoa(h.Count) == IPv6GWHop {
@@ -281,21 +287,18 @@ func getStarlinkIPv6ActiveGateway() string {
 	fmt.Println("GW not detected using mtr")
 	fmt.Println("Trying traceroute")
 
-	for {
-		cmd := exec.Command("traceroute", "-6", "-i", IFACE, "ipv6.google.com", "-n", "-m", IPv6GWHop, "-f", IPv6GWHop, "-q", "1")
-		tracerouteResult := ""
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Panic(err)
-		}
-		tracerouteResult = string(output)
-		GW := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
-		GW = strings.Split(GW, " ")[3]
-		if GW == "*" || net.ParseIP(GW).To16() == nil {
-			log.Fatal("traceroute failed")
-		}
-		return GW
+	output, err := exec.Command("traceroute", "-6", "-i", IFACE, "ipv6.google.com", "-n", "-m", IPv6GWHop, "-f", IPv6GWHop, "-q", "1").CombinedOutput()
+	if err != nil {
+		log.Panic(err)
 	}
+	tracerouteResult := ""
+	tracerouteResult = string(output)
+	GW := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
+	GW = strings.Split(GW, " ")[3]
+	if GW == "*" || net.ParseIP(GW).To16() == nil {
+		log.Fatal("traceroute failed")
+	}
+	return GW
 }
 
 func getInactiveIPv6PoP() string {
