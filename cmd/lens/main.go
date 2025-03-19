@@ -450,6 +450,20 @@ func sync_data() {
 
 func main() {
 	checkInstalled()
+
+	grpcClient, err := NewGrpcClient(DishAddress)
+	if err != nil {
+		log.Println("Error creating gRPC client: ", err)
+	} else {
+		obstructionMap := grpcClient.CollectDishObstructionMap()
+		file := "obstruction_map.png"
+		f, _ := os.Create(file)
+		defer f.Close()
+
+		// save obstructionMap.Data of type []byte to file
+		f.Write(obstructionMap.Data)
+	}
+
 	getConfig()
 
 	s, err := gocron.NewScheduler()
