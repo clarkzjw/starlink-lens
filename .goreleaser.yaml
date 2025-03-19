@@ -1,0 +1,52 @@
+project_name: lens
+version: 2
+builds:
+  - main: ./cmd/lens
+    id: "lens"
+    binary: lens
+    env: [CGO_ENABLED=0]
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - 386
+    goarm:
+      - 6
+      - 7
+
+# https://goreleaser.com/customization/nfpm/
+nfpms:
+  - maintainer: clarkzjw <i@jinwei.me>
+    description: LENS client to collect Starlink network measurement results
+    homepage: https://github.com/clarkzjw/starlink-lens
+    license: MIT
+    package_name: lens
+    dependencies:
+    - bash
+    - coreutils
+    - wget
+    - tree
+    - iputils-ping
+    - mtr
+    - curl
+    - traceroute
+    - zstd
+    - sshpass
+    - rsync
+    - git
+    - sudo
+    - iproute2
+    - dnsutils
+    replaces:
+    - inetutils-ping
+    - mtr-tiny
+    formats:
+    - deb
+    priority: extra
+    contents:
+    - src: ./etc/systemd/lens.service
+      dst: /lib/systemd/system/lens.service
+      file_info:
+        mode: 0644
