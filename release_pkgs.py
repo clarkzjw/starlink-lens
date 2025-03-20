@@ -255,6 +255,8 @@ def parse_args():
             "bullseye",
             "noble",
             "jammy",
+            "focal",
+            "bionic"
         ],
         help="list of debian based releases that need to be packaged for",
     )

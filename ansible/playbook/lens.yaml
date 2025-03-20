@@ -44,6 +44,12 @@
       # - name: Print all available facts
       #   ansible.builtin.debug:
       #     var: ansible_facts
+      - name: mkdir /etc/apt/keyrings
+        ansible.builtin.file:
+          path: /etc/apt/keyrings
+          state: directory
+          mode: '0755'
+
       - name: add apt key
         ansible.builtin.get_url:
           url: https://pkg.jinwei.me/clarkzjw-pkg.key
