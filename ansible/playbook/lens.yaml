@@ -1,7 +1,7 @@
-- name: install common packages
+- name: install common packages and lens
   hosts: all
   tasks:
-    - name: Install packages
+    - name: Install common packages
       apt:
         name:
           - apt-transport-https
@@ -23,11 +23,15 @@
           - git
           - zsh
           - mtr
+          - neofetch
           - traceroute
           - dnsutils
           - iputils-ping
           - vnstat
           - iproute2
+          - python3
+          - python3-apt
+          - libapt-pkg-dev
         update_cache: true
 
 - name: Install lens by apt
