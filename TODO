@@ -1,0 +1,4 @@
++ create `lens` Linux user and group
++ create `/opt/lens` directory
++ add a sample `config.ini` in `/opt/lens`
++ set file permissions for `/opt/lens` to `lens:lens`
