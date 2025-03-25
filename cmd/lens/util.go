@@ -19,7 +19,7 @@ func getTimeString() string {
 }
 
 func checkInstalled() {
-	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl"}
+	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "tar"}
 	for _, c := range cmds {
 		if _, err := exec.LookPath(c); err != nil {
 			if _, err := os.Stat(c); err != nil {
@@ -52,8 +52,32 @@ func checkDirectory() string {
 	return today
 }
 
+func checkZstd() error {
+	cmds := []string{"zstd"}
+	for _, c := range cmds {
+		if _, err := exec.LookPath(c); err != nil {
+			if _, err := os.Stat(c); err != nil {
+				return fmt.Errorf("%s is not installed", c)
+			}
+		}
+	}
+
+	cmd := exec.Command("tar", "--zstd")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Println("Error checking zstd: ", err)
+	}
+	if strings.Contains(string(output), "unrecognized option") {
+		return fmt.Errorf("zstd is not supported")
+	}
+	return nil
+}
+
 func compress(directory, filename string) error {
 	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
+	if err := checkZstd(); err != nil {
+		cmd = exec.Command("tar", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.gz", filename)), filename, "--remove-files")
+	}
 	log.Println(cmd.String())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -32,7 +32,7 @@ nfpms:
     - mtr
     - curl
     - traceroute
-    - zstd
+    # - zstd
     - sshpass
     - rsync
     - git
