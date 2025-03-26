@@ -92,7 +92,7 @@ func getConfigFromEnv() {
 }
 
 func getConfigFromFile() {
-	cfg, err := ini.Load("config.ini")
+	cfg, err := ini.Load("/opt/lens/config.ini")
 	if err != nil {
 		fmt.Printf("Fail to read file: %v", err)
 		os.Exit(1)
@@ -127,7 +127,7 @@ func getConfigFromFile() {
 }
 
 func GetConfig() {
-	if _, err := os.Stat("config.ini"); err == nil {
+	if _, err := os.Stat("/opt/lens/config.ini"); err == nil {
 		getConfigFromFile()
 	} else {
 		getConfigFromEnv()

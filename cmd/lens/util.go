@@ -95,6 +95,7 @@ func getExternalIP(IPVersion int) string {
 	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ipconfig.io").CombinedOutput()
 	if err != nil {
 		log.Println("get external IP failed: ", err)
+		log.Println("output: ", string(output))
 		return ""
 	}
 	return strings.Trim(string(output), "\n")
@@ -190,6 +191,9 @@ func getGateway() string {
 	if !ACTIVE {
 		PoP = getInactiveIPv6PoP()
 		return defaultIPv6InactiveGateway
+	}
+	if MANUAL_GW != "" {
+		return MANUAL_GW
 	}
 	// Active dish, probe IPv6 active gateway through mtr or traceroute
 	external_ip6 = getExternalIP(6)
