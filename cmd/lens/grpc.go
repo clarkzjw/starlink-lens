@@ -87,23 +87,25 @@ func (e *Exporter) CollectDishStatus() *StarlinkGetStatusResponse {
 		DownlinkThroughputBps:         dishStatus.GetDownlinkThroughputBps(),
 		UplinkThroughputBps:           dishStatus.GetUplinkThroughputBps(),
 		PopPingLatencyMs:              dishStatus.GetPopPingLatencyMs(),
+		PhyRxBeamSnrAvg:               dishStatus.GetPhyRxBeamSnrAvg(),
 	}
 	return dishStatusResp
 }
 
 // struct get_status response
 type StarlinkGetStatusResponse struct {
-	Timestamp                     string  `json:"time"`
-	HardwareVersion               string  `json:"hardware_version"`
-	SoftwareVersion               string  `json:"software_version"`
-	CountryCode                   string  `json:"country_code"`
-	BuildID                       string  `json:"build_id"`
-	DeviceUptimeSeconds           uint64  `json:"device_uptime_seconds"`
-	ObstructionFractionObstructed float32 `json:"obstruction_fraction_obstructed"`
-	ObstructionTimeObstructed     float32 `json:"obstruction_time_obstructed"`
-	DownlinkThroughputBps         float32 `json:"downlink_throughput_bps"`
-	UplinkThroughputBps           float32 `json:"uplink_throughput_bps"`
-	PopPingLatencyMs              float32 `json:"pop_ping_latency_ms"`
+	Timestamp                     string
+	HardwareVersion               string
+	SoftwareVersion               string
+	CountryCode                   string
+	BuildID                       string
+	DeviceUptimeSeconds           uint64
+	ObstructionFractionObstructed float32
+	ObstructionTimeObstructed     float32
+	DownlinkThroughputBps         float32
+	UplinkThroughputBps           float32
+	PopPingLatencyMs              float32
+	PhyRxBeamSnrAvg               float32
 }
 
 func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapResponse {
@@ -172,9 +174,9 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 
 // struct get_status response
 type StarlinkGetObstructionMapResponse struct {
-	Timestamp         string `json:"time"`
-	MapReferenceFrame string `json:"map_reference_frame"`
-	Rows              int    `json:"rows"`
-	Cols              int    `json:"cols"`
-	Data              []byte `json:"data"`
+	Timestamp         string
+	MapReferenceFrame string
+	Rows              int
+	Cols              int
+	Data              []byte
 }

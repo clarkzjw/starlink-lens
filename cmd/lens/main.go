@@ -101,6 +101,22 @@ func main() {
 		}
 	}
 
+	if ENABLE_SINR {
+		_, err = s.NewJob(
+			gocron.CronJob(
+				CRON,
+				false,
+			),
+			gocron.NewTask(
+				get_sinr,
+				GRPC_ADDR_PORT,
+			),
+		)
+		if err != nil {
+			log.Fatal("Error creating get_sinr job: ", err)
+		}
+	}
+
 	s.Start()
 
 	for _, j := range s.Jobs() {

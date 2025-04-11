@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	configFilePath             = "/opt/lens/config.ini"
 	defaultDishAddress         = "192.168.100.1:9200"
 	grpcTimeout                = 5 * time.Second
 	defaultIPv6GWHop           = "2"
@@ -40,6 +41,7 @@ var (
 	ENABLE_IRTT    = false
 	ENABLE_FLENT   = false
 	ENABLE_SYNC    = false
+	ENABLE_SINR    = false
 	CLIENT_NAME    string
 	NOTIFY_URL     string
 	SYNC_SERVER    string
@@ -89,10 +91,13 @@ func getConfigFromEnv() {
 	if LOCAL_IP, ok = os.LookupEnv("LOCAL_IP"); !ok {
 		LOCAL_IP = ""
 	}
+	if _ENABLE_SINR, ok := os.LookupEnv("ENABLE_SINR"); ok {
+		ENABLE_SINR, _ = strconv.ParseBool(_ENABLE_SINR)
+	}
 }
 
 func getConfigFromFile() {
-	cfg, err := ini.Load("/opt/lens/config.ini")
+	cfg, err := ini.Load(configFilePath)
 	if err != nil {
 		fmt.Printf("Fail to read file: %v", err)
 		os.Exit(1)
@@ -124,10 +129,12 @@ func getConfigFromFile() {
 		SYNC_CRON = cfg.Section("sync").Key("SYNC_CRON").String()
 		SSHPASS_PATH = cfg.Section("sync").Key("SSHPASS_PATH").String()
 	}
+
+	ENABLE_SINR = cfg.Section("").Key("ENABLE_SINR").MustBool()
 }
 
 func GetConfig() {
-	if _, err := os.Stat("/opt/lens/config.ini"); err == nil {
+	if _, err := os.Stat(configFilePath); err == nil {
 		getConfigFromFile()
 	} else {
 		getConfigFromEnv()
