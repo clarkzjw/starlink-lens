@@ -63,10 +63,13 @@ func checkZstd() error {
 	}
 
 	cmd := exec.Command("tar", "--zstd")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Println("Error checking zstd: ", err)
-	}
+	output, _ := cmd.CombinedOutput()
+	// Normally, when zstd is installed,
+	// tar --zstd
+	// tar: You must specify one of the '-Acdtrux', '--delete' or '--test-label' options
+	// Try 'tar --help' or 'tar --usage' for more information.
+	// return code is $? = 2
+	// no need to check err, but to check output whether zstd is supported by this version of tar
 	if strings.Contains(string(output), "unrecognized option") {
 		return fmt.Errorf("zstd is not supported")
 	}
