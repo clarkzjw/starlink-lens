@@ -94,6 +94,11 @@ func getConfigFromEnv() {
 	if _ENABLE_SINR, ok := os.LookupEnv("ENABLE_SINR"); ok {
 		ENABLE_SINR, _ = strconv.ParseBool(_ENABLE_SINR)
 	}
+	if _GRPC_ADDR_PORT, ok := os.LookupEnv("GRPC_ADDR_PORT"); ok {
+		GRPC_ADDR_PORT = _GRPC_ADDR_PORT
+	} else {
+		GRPC_ADDR_PORT = defaultDishAddress
+	}
 }
 
 func getConfigFromFile() {
@@ -104,6 +109,9 @@ func getConfigFromFile() {
 	}
 
 	GRPC_ADDR_PORT = cfg.Section("").Key("GRPC_ADDR_PORT").String()
+	if GRPC_ADDR_PORT == "" {
+		GRPC_ADDR_PORT = defaultDishAddress
+	}
 	GW4 = cfg.Section("").Key("GW4").String()
 	GW6 = cfg.Section("").Key("GW6").String()
 	MANUAL_GW = cfg.Section("").Key("MANUAL_GW").String()

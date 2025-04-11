@@ -112,7 +112,6 @@ Since Starlink dish firmware [`2025.04.08.cr53207`](https://github.com/clarkzjw/
 
 To capture continuous SINR measurement, one can set `ENABLE_SINR = True` in `config.ini`.
 
-
 ### Complete Configuration Example
 
 ```ini
