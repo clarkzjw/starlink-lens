@@ -20,7 +20,7 @@ func get_sinr(GRPC_ADDR_PORT string) {
 
 		today := checkDirectory()
 
-		filename := fmt.Sprintf("sinr-%s.csv", getTimeString())
+		filename := fmt.Sprintf("sinr-%s.txt", getTimeString())
 		filename_full := path.Join("data", today, filename)
 
 		go func(ctx context.Context) {
