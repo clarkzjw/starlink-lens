@@ -16,7 +16,7 @@ for i in $(seq 108 109); do
     done
 done
 
-for i in $(seq 64 70); do
+for i in $(seq 64 95); do
     for j in $(seq 0 255); do
         echo "Tracing 206.224.$i.$j"
         traceroute -enm 18 -w 1 206.224.$i.$j >> "$OUTPUT_FILE_SUBNET2"
