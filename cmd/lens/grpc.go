@@ -142,7 +142,7 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 			if snr == -1 {
 				// background
 				img.Set(x, y, color.Black)
-			} else if snr > 0 {
+			} else if snr >= 0 {
 				// use the same image color style as in starlink-grpc-tools
 				// https://github.com/sparky8512/starlink-grpc-tools/blob/a3860e0a73d0b2280eed92eb8a2a97de0ea5fe43/dish_obstruction_map.py#L59-L87
 				r := 255
