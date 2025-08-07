@@ -7,6 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/clarkzjw/starlink-grpc-golang v0.0.0-20250411070715-a5267431cc5f
 	github.com/go-co-op/gocron/v2 v2.16.1
+	github.com/pbnjay/pixfont v0.0.0-20200714042608-33b744692567
 	google.golang.org/grpc v1.71.1
 	gopkg.in/ini.v1 v1.67.0
 )

@@ -15,6 +15,9 @@ github.com/google/uuid
 # github.com/jonboulle/clockwork v0.5.0
 ## explicit; go 1.21
 github.com/jonboulle/clockwork
+# github.com/pbnjay/pixfont v0.0.0-20200714042608-33b744692567
+## explicit; go 1.13
+github.com/pbnjay/pixfont
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
