@@ -95,7 +95,7 @@ func getExternalIP(IPVersion int) string {
 	if IPVersion != 4 && IPVersion != 6 {
 		IPVersion = 6
 	}
-	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ipconfig.io").CombinedOutput()
+	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ifconfig.io").CombinedOutput()
 	if err != nil {
 		log.Println("get external IP failed: ", err)
 		log.Println("output: ", string(output))

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 )
 
 func icmp_ping(target string, interval float64) {
@@ -45,12 +46,12 @@ func icmp_ping(target string, interval float64) {
 }
 
 func irtt_ping() {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	ctx, cancel := context.WithTimeout(context.Background(), duration+time.Duration(time.Minute*10))
 	defer cancel()
 
 	today := checkDirectory()
 
-	filename := fmt.Sprintf("irtt-%s-%s-%s-%s.json", PoP, INTERVAL, DURATION, getTimeString())
+	filename := fmt.Sprintf("irtt-%s-%s-%s-%s.json.gz", PoP, INTERVAL, DURATION, getTimeString())
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {
@@ -70,7 +71,4 @@ func irtt_ping() {
 	}(ctx)
 
 	<-ctx.Done()
-	if err := compress(path.Join(DATA_DIR, today), filename); err != nil {
-		log.Println(err)
-	}
 }
