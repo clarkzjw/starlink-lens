@@ -57,8 +57,8 @@ jobs:
         id: install-python-deps
         run: poetry install
 
-      - name: Create Release Server
-        id: createRelease-server
+      - name: Create Release
+        id: createRelease
         uses: goreleaser/goreleaser-action@v6
         if: success() && startsWith(github.ref, 'refs/tags/')
         with:
@@ -82,7 +82,6 @@ jobs:
           CF_KEY_ID: ${{ secrets.CF_KEY_ID }}
           CF_KEY_SECRET: ${{ secrets.CF_KEY_SECRET }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          CF_BINARY: lens
           CF_RELEASE_TAG: ${{ env.SOURCE_TAG }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
