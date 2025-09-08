@@ -15,6 +15,20 @@ builds:
     goarm:
       - 6
       - 7
+  - main: ./cmd/obstructionMapVideo
+    id: "obstructionMapVideo"
+    binary: obstructionMapVideo
+    env: [CGO_ENABLED=0]
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - 386
+    goarm:
+      - 6
+      - 7
 
 # https://goreleaser.com/customization/nfpm/
 nfpms:
@@ -32,7 +46,6 @@ nfpms:
     - mtr
     - curl
     - traceroute
-    # - zstd
     - sshpass
     - rsync
     - git
@@ -42,6 +55,9 @@ nfpms:
     replaces:
     - inetutils-ping
     - mtr-tiny
+    suggests:
+    - ffmpeg
+    - zstd
     formats:
     - deb
     priority: extra
