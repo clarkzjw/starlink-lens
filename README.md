@@ -108,9 +108,10 @@ It saves the obstruction map in png format in the current directory with the nam
 
 ### SINR Measurement
 
-Since Starlink dish firmware [`2025.04.08.cr53207`](https://github.com/clarkzjw/starlink-grpc-golang/commit/b26a153763dbf8c84dcd3b54c4fda0a3a084e5b7), gRPC method `get_status` returns `PhyRxBeamSnrAvg`.
+This firmware feature has been removed by Starlink.
 
-To capture continuous SINR measurement, one can set `ENABLE_SINR = True` in `config.ini`.
+~~Since Starlink dish firmware [`2025.04.08.cr53207`](https://github.com/clarkzjw/starlink-grpc-golang/commit/b26a153763dbf8c84dcd3b54c4fda0a3a084e5b7), gRPC method `get_status` returns `PhyRxBeamSnrAvg`.~~
+~~To capture continuous SINR measurement, one can set `ENABLE_SINR = True` in `config.ini`.~~
 
 ### Complete Configuration Example
 

@@ -14,11 +14,11 @@ import (
 	"time"
 )
 
-func getTimeString() string {
+func datetimeString() string {
 	return time.Now().UTC().Format("2006-01-02-15-04-05")
 }
 
-func checkInstalled() {
+func CheckPkgsInstalled() {
 	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "tar"}
 	for _, c := range cmds {
 		if _, err := exec.LookPath(c); err != nil {

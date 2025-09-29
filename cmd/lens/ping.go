@@ -16,7 +16,7 @@ func icmp_ping(target string, interval float64) {
 	defer cancel()
 
 	today := checkDirectory()
-	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, getTimeString())
+	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, datetimeString())
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {
@@ -51,7 +51,7 @@ func irtt_ping() {
 
 	today := checkDirectory()
 
-	filename := fmt.Sprintf("irtt-%s-%s-%s-%s.json.gz", PoP, INTERVAL, DURATION, getTimeString())
+	filename := fmt.Sprintf("irtt-%s-%s-%s-%s.json.gz", PoP, INTERVAL, DURATION, datetimeString())
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {

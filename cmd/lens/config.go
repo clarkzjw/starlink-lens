@@ -161,7 +161,6 @@ func GetConfig() {
 		if GW == "" {
 			log.Fatal("GW not detected")
 		}
-		//fmt.Println("GW: ", GW)
 	}
 
 	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {

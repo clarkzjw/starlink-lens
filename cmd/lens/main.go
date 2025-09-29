@@ -4,13 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/go-co-op/gocron/v2"
 )
 
 func main() {
-	checkInstalled()
+	CheckPkgsInstalled()
 	GetConfig()
 
 	getObstructionMap := flag.Bool("map", false, "Get obstruction map")
@@ -22,21 +21,14 @@ func main() {
 		}
 		grpcClient, err := NewGrpcClient(GRPC_ADDR_PORT)
 		if err != nil {
-			log.Println("Error creating gRPC client: ", err)
-			return
-		} else {
-			obstructionMap := grpcClient.CollectDishObstructionMap()
-			datetime := getTimeString()
-			file := fmt.Sprintf("obstruction-map-%s.png", datetime)
-			f, _ := os.Create(file)
-			defer f.Close()
-			_, err = f.Write(obstructionMap.Data)
-			if err != nil {
-				log.Println("Error writing obstruction map: ", err)
-			}
-			return
+			log.Fatal("Error creating gRPC client: ", err)
+		}
+		filename := fmt.Sprintf("obstruction-map-%s.png", datetimeString())
+		if err := grpcClient.WriteObstructionMapImage(filename); err != nil {
+			log.Fatal("Error writing obstruction map image: ", err)
 		}
 	}
+
 	if IFACE == "" {
 		log.Fatal("IFACE is not set")
 	}
@@ -98,22 +90,6 @@ func main() {
 		)
 		if err != nil {
 			log.Fatal("Error creating sync_data job: ", err)
-		}
-	}
-
-	if ENABLE_SINR {
-		_, err = s.NewJob(
-			gocron.CronJob(
-				CRON,
-				false,
-			),
-			gocron.NewTask(
-				get_sinr,
-				GRPC_ADDR_PORT,
-			),
-		)
-		if err != nil {
-			log.Fatal("Error creating get_sinr job: ", err)
 		}
 	}
 
