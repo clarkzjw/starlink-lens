@@ -17,7 +17,7 @@ var (
 	external_ip4               string
 	external_ip6               string
 
-	GRPC_ADDR_PORT string
+	CLIENT_NAME    string
 	GW4            string
 	GW6            string
 	MANUAL_GW      string
@@ -35,17 +35,17 @@ var (
 	PoP            string
 	IPVersion      int
 	ENABLE_IRTT    = false
-	ENABLE_FLENT   = false
-	ENABLE_SYNC    = false
-	ENABLE_SINR    = false
-	CLIENT_NAME    string
-	NOTIFY_URL     string
-	SYNC_SERVER    string
-	SYNC_USER      string
-	SYNC_KEY       string
-	SYNC_PATH      string
-	SYNC_CRON      string
-	SSHPASS_PATH   string
+
+	GRPC_ADDR_PORT string
+
+	ENABLE_SYNC  = false
+	NOTIFY_URL   string
+	SYNC_SERVER  string
+	SYNC_USER    string
+	SYNC_KEY     string
+	SYNC_PATH    string
+	SYNC_CRON    string
+	SSHPASS_PATH string
 
 	ENABLE_S3      = false
 	S3_REGION      string
