@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	configFilePath             = "/opt/lens/config.ini"
+	defaultFilePath            = "/opt/lens/config.ini"
+	configFilePath             *string
 	defaultDishAddress         = "192.168.100.1:9200"
 	grpcTimeout                = 5 * time.Second
 	defaultIPv6GWHop           = "2"
@@ -50,6 +51,12 @@ var (
 	SYNC_PATH      string
 	SYNC_CRON      string
 	SSHPASS_PATH   string
+
+	S3_REGION      string
+	S3_ENDPOINT    string
+	S3_BUCKET_NAME string
+	S3_ACCESS_KEY  string
+	S3_SECRET_KEY  string
 )
 
 // deprecated: use getConfigFromFile instead
@@ -102,7 +109,11 @@ func getConfigFromEnv() {
 }
 
 func getConfigFromFile() {
-	cfg, err := ini.Load(configFilePath)
+	if configFilePath == nil {
+		configFilePath = &defaultFilePath
+	}
+	log.Println("Using config file:", *configFilePath)
+	cfg, err := ini.Load(*configFilePath)
 	if err != nil {
 		fmt.Printf("Fail to read file: %v", err)
 		os.Exit(1)
@@ -139,10 +150,16 @@ func getConfigFromFile() {
 	}
 
 	ENABLE_SINR = cfg.Section("").Key("ENABLE_SINR").MustBool()
+
+	S3_REGION = cfg.Section("s3").Key("REGION").String()
+	S3_ENDPOINT = cfg.Section("s3").Key("ENDPOINT").String()
+	S3_BUCKET_NAME = cfg.Section("s3").Key("BUCKET_NAME").String()
+	S3_ACCESS_KEY = cfg.Section("s3").Key("ACCESS_KEY").String()
+	S3_SECRET_KEY = cfg.Section("s3").Key("SECRET_KEY").String()
 }
 
 func GetConfig() {
-	if _, err := os.Stat(configFilePath); err == nil {
+	if _, err := os.Stat(*configFilePath); err == nil {
 		getConfigFromFile()
 	} else {
 		getConfigFromEnv()
