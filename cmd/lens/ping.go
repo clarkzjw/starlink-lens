@@ -43,6 +43,10 @@ func icmp_ping(target string, interval float64) {
 	if err := compress(path.Join(DATA_DIR, today), filename); err != nil {
 		log.Println(err)
 	}
+
+	if ENABLE_S3 {
+		upload_to_s3(filename_full+".tar.zst", path.Join(CLIENT_NAME, "ping", today, filename+".tar.zst"))
+	}
 }
 
 func irtt_ping() {
@@ -71,4 +75,8 @@ func irtt_ping() {
 	}(ctx)
 
 	<-ctx.Done()
+
+	if ENABLE_S3 {
+		upload_to_s3(filename_full, path.Join(CLIENT_NAME, "irtt", today, filename))
+	}
 }

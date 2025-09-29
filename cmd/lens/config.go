@@ -52,6 +52,7 @@ var (
 	SYNC_CRON      string
 	SSHPASS_PATH   string
 
+	ENABLE_S3      = false
 	S3_REGION      string
 	S3_ENDPOINT    string
 	S3_BUCKET_NAME string
@@ -151,6 +152,7 @@ func getConfigFromFile() {
 
 	ENABLE_SINR = cfg.Section("").Key("ENABLE_SINR").MustBool()
 
+	ENABLE_S3 = cfg.Section("s3").Key("ENABLE_S3").MustBool()
 	S3_REGION = cfg.Section("s3").Key("REGION").String()
 	S3_ENDPOINT = cfg.Section("s3").Key("ENDPOINT").String()
 	S3_BUCKET_NAME = cfg.Section("s3").Key("BUCKET_NAME").String()
