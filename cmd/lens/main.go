@@ -19,8 +19,8 @@ func init() {
 
 	flag.Parse()
 
-	CheckPkgsInstalled()
 	GetConfig()
+	CheckPkgsInstalled()
 }
 
 func main() {

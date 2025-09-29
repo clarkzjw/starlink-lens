@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"time"
 )
 
@@ -45,7 +46,7 @@ func icmp_ping(target string, interval float64) {
 	}
 
 	if ENABLE_S3 {
-		upload_to_s3(filename_full+".tar.zst", path.Join(CLIENT_NAME, "ping", today, filename+".tar.zst"))
+		upload_to_s3(filename_full+".tar.zst", path.Join(CLIENT_NAME, "ping", strconv.Itoa(time.Now().Year()), today))
 	}
 }
 
@@ -77,6 +78,6 @@ func irtt_ping() {
 	<-ctx.Done()
 
 	if ENABLE_S3 {
-		upload_to_s3(filename_full, path.Join(CLIENT_NAME, "irtt", today, filename))
+		upload_to_s3(filename_full, path.Join(CLIENT_NAME, "irtt", strconv.Itoa(time.Now().Year()), today))
 	}
 }

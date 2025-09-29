@@ -20,6 +20,9 @@ func datetimeString() string {
 
 func CheckPkgsInstalled() {
 	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "tar"}
+	if ENABLE_IRTT {
+		cmds = append(cmds, "irtt")
+	}
 	for _, c := range cmds {
 		if _, err := exec.LookPath(c); err != nil {
 			if _, err := os.Stat(c); err != nil {
