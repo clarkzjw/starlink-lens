@@ -4,19 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
-	"gopkg.in/ini.v1"
+	"github.com/joho/godotenv"
 )
 
 var (
-	defaultFilePath            = "/opt/lens/config.ini"
-	configFilePath             *string
 	defaultDishAddress         = "192.168.100.1:9200"
 	grpcTimeout                = 5 * time.Second
-	defaultIPv6GWHop           = "2"
-	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
 	duration                   time.Duration
 	external_ip4               string
@@ -60,111 +55,54 @@ var (
 	S3_SECRET_KEY  string
 )
 
-// deprecated: use getConfigFromFile instead
-func getConfigFromEnv() {
-	var ok bool
-	if GW4, ok = os.LookupEnv("GW4"); !ok {
-		GW4 = defaultIPv4CGNATGateway
-	}
-	if GW6, ok = os.LookupEnv("GW6"); !ok {
-		GW6 = defaultIPv6InactiveGateway
-	}
-	if DURATION, ok = os.LookupEnv("DURATION"); !ok {
-		DURATION = "1h"
-	}
-	if INTERVAL, ok = os.LookupEnv("INTERVAL"); !ok {
-		INTERVAL = "10ms"
-	}
-	if _ACTIVE, ok := os.LookupEnv("ACTIVE"); ok {
-		ACTIVE, _ = strconv.ParseBool(_ACTIVE)
-	}
-	if IFACE, ok = os.LookupEnv("IFACE"); !ok {
-		IFACE = ""
-	}
-	if IPv6GWHop, ok = os.LookupEnv("IPv6GWHop"); !ok {
-		IPv6GWHop = defaultIPv6GWHop
-	}
-	if CRON, ok = os.LookupEnv("CRON"); !ok {
-		CRON = "0 * * * *"
-	}
-	if DATA_DIR, ok = os.LookupEnv("DATA_DIR"); !ok {
-		DATA_DIR = "data"
-	}
-	if _ENABLE_IRTT, ok := os.LookupEnv("ENABLE_IRTT"); ok {
-		ENABLE_IRTT, _ = strconv.ParseBool(_ENABLE_IRTT)
-	}
-	if IRTT_HOST_PORT, ok = os.LookupEnv("IRTT_HOST_PORT"); !ok {
-		IRTT_HOST_PORT = ""
-	}
-	if LOCAL_IP, ok = os.LookupEnv("LOCAL_IP"); !ok {
-		LOCAL_IP = ""
-	}
-	if _ENABLE_SINR, ok := os.LookupEnv("ENABLE_SINR"); ok {
-		ENABLE_SINR, _ = strconv.ParseBool(_ENABLE_SINR)
-	}
-	if _GRPC_ADDR_PORT, ok := os.LookupEnv("GRPC_ADDR_PORT"); ok {
-		GRPC_ADDR_PORT = _GRPC_ADDR_PORT
-	} else {
-		GRPC_ADDR_PORT = defaultDishAddress
-	}
-}
-
-func getConfigFromFile() {
-	if configFilePath == nil {
-		configFilePath = &defaultFilePath
-	}
-	log.Println("Using config file:", *configFilePath)
-	cfg, err := ini.Load(*configFilePath)
+func getConfigFromEnv() error {
+	err := godotenv.Load()
 	if err != nil {
-		fmt.Printf("Fail to read file: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("error loading .env file: %v", err)
 	}
 
-	GRPC_ADDR_PORT = cfg.Section("").Key("GRPC_ADDR_PORT").String()
+	GRPC_ADDR_PORT = os.Getenv("GRPC_ADDR_PORT")
 	if GRPC_ADDR_PORT == "" {
 		GRPC_ADDR_PORT = defaultDishAddress
 	}
-	GW4 = cfg.Section("").Key("GW4").String()
-	GW6 = cfg.Section("").Key("GW6").String()
-	MANUAL_GW = cfg.Section("").Key("MANUAL_GW").String()
-	DURATION = cfg.Section("").Key("DURATION").String()
-	INTERVAL = cfg.Section("").Key("INTERVAL").String()
-	IFACE = cfg.Section("").Key("IFACE").String()
-	ACTIVE = cfg.Section("").Key("ACTIVE").MustBool()
-	IPv6GWHop = cfg.Section("").Key("IPv6GWHop").String()
-	CRON = cfg.Section("").Key("CRON").String()
-	DATA_DIR = cfg.Section("").Key("DATA_DIR").String()
-	ENABLE_IRTT = cfg.Section("").Key("ENABLE_IRTT").MustBool()
-	IRTT_HOST_PORT = cfg.Section("").Key("IRTT_HOST_PORT").String()
-	LOCAL_IP = cfg.Section("").Key("LOCAL_IP").String()
+	GW4 = os.Getenv("GW4")
+	GW6 = os.Getenv("GW6")
+	MANUAL_GW = os.Getenv("MANUAL_GW")
+	DURATION = os.Getenv("DURATION")
+	INTERVAL = os.Getenv("INTERVAL")
+	IFACE = os.Getenv("IFACE")
+	ACTIVE = os.Getenv("ACTIVE") == "true"
+	IPv6GWHop = os.Getenv("IPv6GWHop")
+	CRON = os.Getenv("CRON")
+	DATA_DIR = os.Getenv("DATA_DIR")
+	ENABLE_IRTT = os.Getenv("ENABLE_IRTT") == "true"
+	IRTT_HOST_PORT = os.Getenv("IRTT_HOST_PORT")
+	LOCAL_IP = os.Getenv("LOCAL_IP")
 
-	ENABLE_SYNC = cfg.Section("sync").Key("ENABLE_SYNC").MustBool()
-	if ENABLE_SYNC {
-		CLIENT_NAME = cfg.Section("sync").Key("CLIENT_NAME").String()
-		NOTIFY_URL = cfg.Section("sync").Key("NOTIFY_URL").String()
-		SYNC_SERVER = cfg.Section("sync").Key("SYNC_SERVER").String()
-		SYNC_USER = cfg.Section("sync").Key("SYNC_USER").String()
-		SYNC_KEY = cfg.Section("sync").Key("SYNC_KEY").String()
-		SYNC_PATH = cfg.Section("sync").Key("SYNC_PATH").String()
-		SYNC_CRON = cfg.Section("sync").Key("SYNC_CRON").String()
-		SSHPASS_PATH = cfg.Section("sync").Key("SSHPASS_PATH").String()
-	}
+	CLIENT_NAME = os.Getenv("CLIENT_NAME")
 
-	ENABLE_SINR = cfg.Section("").Key("ENABLE_SINR").MustBool()
+	ENABLE_SYNC = os.Getenv("ENABLE_SYNC") == "true"
+	NOTIFY_URL = os.Getenv("NOTIFY_URL")
+	SYNC_SERVER = os.Getenv("SYNC_SERVER")
+	SYNC_USER = os.Getenv("SYNC_USER")
+	SYNC_KEY = os.Getenv("SYNC_KEY")
+	SYNC_PATH = os.Getenv("SYNC_PATH")
+	SYNC_CRON = os.Getenv("SYNC_CRON")
+	SSHPASS_PATH = os.Getenv("SSHPASS_PATH")
 
-	ENABLE_S3 = cfg.Section("s3").Key("ENABLE_S3").MustBool()
-	S3_REGION = cfg.Section("s3").Key("REGION").String()
-	S3_ENDPOINT = cfg.Section("s3").Key("ENDPOINT").String()
-	S3_BUCKET_NAME = cfg.Section("s3").Key("BUCKET_NAME").String()
-	S3_ACCESS_KEY = cfg.Section("s3").Key("ACCESS_KEY").String()
-	S3_SECRET_KEY = cfg.Section("s3").Key("SECRET_KEY").String()
+	ENABLE_S3 = os.Getenv("ENABLE_S3") == "true"
+	S3_REGION = os.Getenv("S3_REGION")
+	S3_ENDPOINT = os.Getenv("S3_ENDPOINT")
+	S3_BUCKET_NAME = os.Getenv("S3_BUCKET_NAME")
+	S3_ACCESS_KEY = os.Getenv("S3_ACCESS_KEY")
+	S3_SECRET_KEY = os.Getenv("S3_SECRET_KEY")
+
+	return nil
 }
 
 func GetConfig() {
-	if _, err := os.Stat(*configFilePath); err == nil {
-		getConfigFromFile()
-	} else {
-		getConfigFromEnv()
+	if err := getConfigFromEnv(); err != nil {
+		log.Fatal(err)
 	}
 
 	if ENABLE_IRTT && IRTT_HOST_PORT == "" {

@@ -15,7 +15,6 @@ var (
 func init() {
 	log.Println("Starlink Lens")
 	getObstructionMap = flag.Bool("map", false, "Get obstruction map")
-	configFilePath = flag.String("config", "/opt/lens/config.ini", "Path to config file")
 
 	flag.Parse()
 
