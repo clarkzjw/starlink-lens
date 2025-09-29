@@ -14,13 +14,14 @@ import (
 
 func icmp_ping(target string, interval float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
 
 	today := checkDirectory()
 	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, datetimeString())
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {
+		defer cancel()
+
 		cmd := exec.CommandContext(ctx, "ping", "-D", "-c", fmt.Sprintf("%d", COUNT), "-i", fmt.Sprintf("%.2f", interval), "-I", IFACE, target)
 		log.Println(cmd.String())
 
@@ -52,7 +53,6 @@ func icmp_ping(target string, interval float64) {
 
 func irtt_ping() {
 	ctx, cancel := context.WithTimeout(context.Background(), duration+time.Duration(time.Minute*10))
-	defer cancel()
 
 	today := checkDirectory()
 
@@ -60,6 +60,8 @@ func irtt_ping() {
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {
+		defer cancel()
+
 		var local string
 		if IPVersion == 6 {
 			local = fmt.Sprintf("--local=[%s]", external_ip6)
