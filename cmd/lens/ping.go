@@ -88,6 +88,7 @@ func ICMPPing(target string, interval float64) {
 
 	if err := compress(path.Join(DataDir, today), filename); err != nil {
 		log.Println(err)
+		return
 	}
 
 	if EnableSwift {

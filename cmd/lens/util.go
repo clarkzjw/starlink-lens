@@ -88,6 +88,15 @@ func checkZstd() error {
 }
 
 func compress(directory, filename string) error {
+	fullFilename := path.Join(directory, filename)
+	fileInfo, err := os.Stat(fullFilename)
+	if err != nil {
+		return fmt.Errorf("error stating file %s: %w", fullFilename, err)
+	}
+	if fileInfo.Size() == 0 {
+		return fmt.Errorf("%s is empty, skipping compression", fullFilename)
+	}
+
 	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
 	if err := checkZstd(); err != nil {
 		cmd = exec.Command("tar", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.gz", filename)), filename, "--remove-files")
