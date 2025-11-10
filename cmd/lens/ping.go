@@ -52,7 +52,7 @@ func icmp_ping(target string, interval float64) {
 	}
 
 	if ENABLE_SWIFT {
-		swift_client, err := new_swift_client(SWIFT_USERNAME, SWIFT_APIKEY, SWIFT_AUTHURL, SWIFT_DOMAIN, CLIENT_NAME)
+		swift_client, err := new_swift_client(SWIFT_USERNAME, SWIFT_APIKEY, SWIFT_AUTHURL, SWIFT_DOMAIN, SWIFT_TENANT)
 		if err != nil {
 			log.Println("Error creating Swift client: ", err)
 			return

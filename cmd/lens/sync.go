@@ -161,6 +161,6 @@ func upload_to_swift(conn *swift.Connection, containerName, localPath, targetPat
 	if err != nil {
 		return fmt.Errorf("failed to upload file %s to Swift: %v", localPath, err)
 	}
-	fmt.Printf("Successfully uploaded %s to container %s as %s\nHeaders: %v", localPath, containerName, targetPath, headers)
+	fmt.Printf("Successfully uploaded %s to container %s as %s\nHeaders: %v\n", localPath, containerName, targetPath, headers)
 	return nil
 }
