@@ -12,6 +12,7 @@ import (
 var (
 	defaultDishAddress         = "192.168.100.1:9200"
 	grpcTimeout                = 5 * time.Second
+	defaultIPv4CGNATGateway    = "100.64.0.1"
 	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
 	duration                   time.Duration
 	external_ip4               string

@@ -100,7 +100,7 @@ func getExternalIP(IPVersion int) string {
 	}
 	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ifconfig.io").CombinedOutput()
 	if err != nil {
-		log.Println("get external IP failed: ", err)
+		log.Printf("get external IP%d addresses failed: %s", IPVersion, err)
 		log.Println("output: ", string(output))
 		return ""
 	}
@@ -112,6 +112,7 @@ func getReverseDNS(ip string) string {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Println(err)
+		return ""
 	}
 	return strings.Trim(string(output), "\n")
 }
@@ -174,49 +175,64 @@ func getStarlinkIPv6ActiveGateway() string {
 	return GW
 }
 
-func getInactiveIPv6PoP() string {
-	ifces, _ := net.Interfaces()
-	for _, iface := range ifces {
-		if iface.Name == IFACE {
-			addrs, _ := iface.Addrs()
-			for _, addr := range addrs {
-				ip, _, _ := net.ParseCIDR(addr.String())
-				pop := getStarlinkPoP(getReverseDNS(ip.String()))
-				if pop != "" {
-					return pop
-				}
-			}
-		}
-	}
-	return ""
-}
+// Deprecated: Now Starlink is moving inactive dishes to stand-by mode,
+// which can still reach the Internet, but at ~500 Kbps
+// and even inactive dishes can reach 100.64.0.1 now.
+// func getInactiveIPv6PoP() string {
+// 	ifces, _ := net.Interfaces()
+// 	for _, iface := range ifces {
+// 		if iface.Name == IFACE {
+// 			addrs, _ := iface.Addrs()
+// 			for _, addr := range addrs {
+// 				ip, _, _ := net.ParseCIDR(addr.String())
+// 				pop := getStarlinkPoP(getReverseDNS(ip.String()))
+// 				if pop != "" {
+// 					return pop
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return ""
+// }
 
 func getGateway() string {
-	// Inactive dish, return default IPv6 inactive gateway
-	// Router Bypass mode has to be set through the Starlink mobile app
-	if !ACTIVE {
-		PoP = getInactiveIPv6PoP()
-		return defaultIPv6InactiveGateway
-	}
 	if MANUAL_GW != "" {
 		return MANUAL_GW
 	}
 	// Active dish, probe IPv6 active gateway through mtr or traceroute
 	external_ip6 = getExternalIP(6)
-	external_ip4 = getExternalIP(4)
 	if ipExist(external_ip6) {
+		// If external IPv6 address exists on the interface
 		log.Println("External IPv6: ", external_ip6)
-		PoP = getStarlinkPoP(getReverseDNS(external_ip6))
-		IPVersion = 6
-		if GW6 != "fe80::200:5eff:fe00:101" {
-			return GW6
+		dns_ptr := getReverseDNS(external_ip6)
+		if dns_ptr == "" {
+			log.Println("get external IPv6 reverse DNS failed")
+		} else {
+			log.Println("External IPv6 reverse DNS: ", dns_ptr)
 		}
+		PoP = getStarlinkPoP(dns_ptr)
+		if PoP == "" {
+			log.Println("get IPv6 PoP code failed")
+		} else {
+			log.Println("IPv6 PoP code: ", PoP)
+		}
+		IPVersion = 6
+		// If a IPv6 gateway is manually specified
+		// if GW6 != "fe80::200:5eff:fe00:101" {
+		// 	return GW6
+		// }
 		return getStarlinkIPv6ActiveGateway()
-	} else if net.ParseIP(external_ip4).To4() != nil {
-		log.Println("External IPv4: ", external_ip4)
-		PoP = getStarlinkPoP(getReverseDNS(external_ip4))
-		IPVersion = 4
-		return GW4
+	} else {
+		external_ip4 = getExternalIP(4)
+
+		if net.ParseIP(external_ip4).To4() != nil {
+			// CGNAT IPv4 does not exist on the interface locally
+			log.Println("External IPv4: ", external_ip4)
+
+			PoP = getStarlinkPoP(getReverseDNS(external_ip4))
+			IPVersion = 4
+			return defaultIPv4CGNATGateway
+		}
 	}
 	log.Fatal("GW not detected, get external IP failed")
 	return ""
