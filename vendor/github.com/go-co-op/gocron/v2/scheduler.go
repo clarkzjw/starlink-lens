@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ type scheduler struct {
 	// the location used by the scheduler for scheduling when relevant
 	location *time.Location
 	// whether the scheduler has been started or not
-	started bool
+	started atomic.Bool
 	// globally applied JobOption's set on all jobs added to the scheduler
 	// note: individually set JobOption's take precedence.
 	globalJobOptions []JobOption
@@ -90,7 +91,7 @@ type scheduler struct {
 	// used to send all the jobs out when a request is made by the client
 	allJobsOutRequest chan allJobsOutRequest
 	// used to send a jobs out when a request is made by the client
-	jobOutRequestCh chan jobOutRequest
+	jobOutRequestCh chan *jobOutRequest
 	// used to run a job on-demand when requested by the client
 	runJobRequestCh chan runJobRequest
 	// new jobs are received here
@@ -140,7 +141,7 @@ func NewScheduler(options ...SchedulerOption) (Scheduler, error) {
 		jobsOutForRescheduling: make(chan uuid.UUID),
 		jobUpdateNextRuns:      make(chan uuid.UUID),
 		jobsOutCompleted:       make(chan uuid.UUID),
-		jobOutRequest:          make(chan jobOutRequest, 1000),
+		jobOutRequest:          make(chan *jobOutRequest, 100),
 		done:                   make(chan error, 1),
 	}
 
@@ -159,7 +160,7 @@ func NewScheduler(options ...SchedulerOption) (Scheduler, error) {
 		startedCh:          make(chan struct{}),
 		stopCh:             make(chan struct{}),
 		stopErrCh:          make(chan error, 1),
-		jobOutRequestCh:    make(chan jobOutRequest),
+		jobOutRequestCh:    make(chan *jobOutRequest),
 		runJobRequestCh:    make(chan runJobRequest),
 		allJobsOutRequest:  make(chan allJobsOutRequest),
 	}
@@ -233,7 +234,8 @@ func NewScheduler(options ...SchedulerOption) (Scheduler, error) {
 
 func (s *scheduler) stopScheduler() {
 	s.logger.Debug("gocron: stopping scheduler")
-	if s.started {
+
+	if s.started.Load() {
 		s.exec.stopCh <- struct{}{}
 	}
 
@@ -244,7 +246,7 @@ func (s *scheduler) stopScheduler() {
 		<-j.ctx.Done()
 	}
 	var err error
-	if s.started {
+	if s.started.Load() {
 		t := time.NewTimer(s.exec.stopTimeout + 1*time.Second)
 		select {
 		case err = <-s.exec.done:
@@ -269,7 +271,7 @@ func (s *scheduler) stopScheduler() {
 	}
 
 	s.stopErrCh <- err
-	s.started = false
+	s.started.Store(false)
 	s.logger.Debug("gocron: scheduler stopped")
 }
 
@@ -297,6 +299,7 @@ func (s *scheduler) selectRunJobRequest(run runJobRequest) {
 		case run.outChan <- ErrJobNotFound:
 		default:
 		}
+		return
 	}
 	select {
 	case <-s.shutdownCtx.Done():
@@ -344,16 +347,32 @@ func (s *scheduler) selectExecJobsOutForRescheduling(id uuid.UUID) {
 	}
 
 	var scheduleFrom time.Time
-	if len(j.nextScheduled) > 0 {
-		// always grab the last element in the slice as that is the furthest
-		// out in the future and the time from which we want to calculate
-		// the subsequent next run time.
-		slices.SortStableFunc(j.nextScheduled, ascendingTime)
-		scheduleFrom = j.nextScheduled[len(j.nextScheduled)-1]
-	}
 
-	if scheduleFrom.IsZero() {
-		scheduleFrom = j.startTime
+	// If intervalFromCompletion is enabled, calculate the next run time
+	// from when the job completed (lastRun) rather than when it was scheduled.
+	if j.intervalFromCompletion {
+		// Use the completion time (lastRun is set when the job completes)
+		scheduleFrom = j.lastRun
+		if scheduleFrom.IsZero() {
+			// For the first run, use the start time or current time
+			scheduleFrom = j.startTime
+			if scheduleFrom.IsZero() {
+				scheduleFrom = s.now()
+			}
+		}
+	} else {
+		// Default behavior: use the scheduled time
+		if len(j.nextScheduled) > 0 {
+			// always grab the last element in the slice as that is the furthest
+			// out in the future and the time from which we want to calculate
+			// the subsequent next run time.
+			slices.SortStableFunc(j.nextScheduled, ascendingTime)
+			scheduleFrom = j.nextScheduled[len(j.nextScheduled)-1]
+		}
+
+		if scheduleFrom.IsZero() {
+			scheduleFrom = j.startTime
+		}
 	}
 
 	next := j.next(scheduleFrom)
@@ -461,7 +480,7 @@ func (s *scheduler) selectExecJobsOutCompleted(id uuid.UUID) {
 	s.jobs[id] = j
 }
 
-func (s *scheduler) selectJobOutRequest(out jobOutRequest) {
+func (s *scheduler) selectJobOutRequest(out *jobOutRequest) {
 	if j, ok := s.jobs[out.id]; ok {
 		select {
 		case out.outChan <- j:
@@ -473,7 +492,7 @@ func (s *scheduler) selectJobOutRequest(out jobOutRequest) {
 
 func (s *scheduler) selectNewJob(in newJobIn) {
 	j := in.job
-	if s.started {
+	if s.started.Load() {
 		next := j.startTime
 		if j.startImmediately {
 			next = s.now()
@@ -524,7 +543,7 @@ func (s *scheduler) selectStart() {
 	s.logger.Debug("gocron: scheduler starting")
 	go s.exec.start()
 
-	s.started = true
+	s.started.Store(true)
 	for id, j := range s.jobs {
 		next := j.startTime
 		if j.startImmediately {
@@ -617,20 +636,22 @@ func (s *scheduler) verifyVariadic(taskFunc reflect.Value, tsk task, variadicSta
 	if err := s.verifyNonVariadic(taskFunc, tsk, variadicStart); err != nil {
 		return err
 	}
-	parameterType := taskFunc.Type().In(variadicStart).Elem().Kind()
-	if parameterType == reflect.Interface {
+	parameterType := taskFunc.Type().In(variadicStart)
+	parameterTypeKind := parameterType.Elem().Kind()
+	if parameterTypeKind == reflect.Interface {
 		return s.verifyInterfaceVariadic(taskFunc, tsk, variadicStart)
 	}
-	if parameterType == reflect.Pointer {
-		parameterType = reflect.Indirect(reflect.ValueOf(taskFunc.Type().In(variadicStart))).Kind()
+	if parameterTypeKind == reflect.Pointer {
+		parameterTypeKind = reflect.Indirect(reflect.ValueOf(parameterType)).Kind()
 	}
 
 	for i := variadicStart; i < len(tsk.parameters); i++ {
-		argumentType := reflect.TypeOf(tsk.parameters[i]).Kind()
-		if argumentType == reflect.Interface || argumentType == reflect.Pointer {
-			argumentType = reflect.TypeOf(tsk.parameters[i]).Elem().Kind()
+		argumentType := reflect.TypeOf(tsk.parameters[i])
+		argumentTypeKind := argumentType.Kind()
+		if argumentTypeKind == reflect.Interface || argumentTypeKind == reflect.Pointer {
+			argumentTypeKind = argumentType.Elem().Kind()
 		}
-		if argumentType != parameterType {
+		if argumentTypeKind != parameterTypeKind {
 			return ErrNewJobWrongTypeOfParameters
 		}
 	}
@@ -639,13 +660,15 @@ func (s *scheduler) verifyVariadic(taskFunc reflect.Value, tsk task, variadicSta
 
 func (s *scheduler) verifyNonVariadic(taskFunc reflect.Value, tsk task, length int) error {
 	for i := 0; i < length; i++ {
-		t1 := reflect.TypeOf(tsk.parameters[i]).Kind()
+		argumentType := reflect.TypeOf(tsk.parameters[i])
+		t1 := argumentType.Kind()
 		if t1 == reflect.Interface || t1 == reflect.Pointer {
-			t1 = reflect.TypeOf(tsk.parameters[i]).Elem().Kind()
+			t1 = argumentType.Elem().Kind()
 		}
-		t2 := reflect.New(taskFunc.Type().In(i)).Elem().Kind()
+		parameterType := taskFunc.Type().In(i)
+		t2 := reflect.New(parameterType).Elem().Kind()
 		if t2 == reflect.Interface || t2 == reflect.Pointer {
-			t2 = reflect.Indirect(reflect.ValueOf(taskFunc.Type().In(i))).Kind()
+			t2 = reflect.Indirect(reflect.ValueOf(parameterType)).Kind()
 		}
 		if t1 != t2 {
 			return ErrNewJobWrongTypeOfParameters
@@ -655,17 +678,20 @@ func (s *scheduler) verifyNonVariadic(taskFunc reflect.Value, tsk task, length i
 }
 
 func (s *scheduler) verifyParameterType(taskFunc reflect.Value, tsk task) error {
-	isVariadic := taskFunc.Type().IsVariadic()
+	taskFuncType := taskFunc.Type()
+	isVariadic := taskFuncType.IsVariadic()
 	if isVariadic {
-		variadicStart := taskFunc.Type().NumIn() - 1
+		variadicStart := taskFuncType.NumIn() - 1
 		return s.verifyVariadic(taskFunc, tsk, variadicStart)
 	}
-	expectedParameterLength := taskFunc.Type().NumIn()
+	expectedParameterLength := taskFuncType.NumIn()
 	if len(tsk.parameters) != expectedParameterLength {
 		return ErrNewJobWrongNumberOfParameters
 	}
 	return s.verifyNonVariadic(taskFunc, tsk, expectedParameterLength)
 }
+
+var contextType = reflect.TypeFor[context.Context]()
 
 func (s *scheduler) addOrUpdateJob(id uuid.UUID, definition JobDefinition, taskWrapper Task, options []JobOption) (Job, error) {
 	j := internalJob{}
@@ -724,7 +750,7 @@ func (s *scheduler) addOrUpdateJob(id uuid.UUID, definition JobDefinition, taskW
 
 	if !taskFunc.IsZero() && taskFunc.Type().NumIn() > 0 {
 		// if the first parameter is a context.Context and params have no context.Context, add current ctx to the params
-		if taskFunc.Type().In(0) == reflect.TypeOf((*context.Context)(nil)).Elem() {
+		if taskFunc.Type().In(0) == contextType {
 			if len(tsk.parameters) == 0 {
 				tsk.parameters = []any{j.ctx}
 				j.parameters = []any{j.ctx}
@@ -736,16 +762,19 @@ func (s *scheduler) addOrUpdateJob(id uuid.UUID, definition JobDefinition, taskW
 	}
 
 	if err := s.verifyParameterType(taskFunc, tsk); err != nil {
+		j.cancel()
 		return nil, err
 	}
 
 	if err := definition.setup(&j, s.location, s.exec.clock.Now()); err != nil {
+		j.cancel()
 		return nil, err
 	}
 
 	newJobCtx, newJobCancel := context.WithCancel(context.Background())
 	select {
 	case <-s.shutdownCtx.Done():
+		newJobCancel()
 	case s.newJobCh <- newJobIn{
 		ctx:    newJobCtx,
 		cancel: newJobCancel,
@@ -756,6 +785,7 @@ func (s *scheduler) addOrUpdateJob(id uuid.UUID, definition JobDefinition, taskW
 	select {
 	case <-newJobCtx.Done():
 	case <-s.shutdownCtx.Done():
+		newJobCancel()
 	}
 
 	out := s.jobFromInternalJob(j)
@@ -808,12 +838,16 @@ func (s *scheduler) StopJobs() error {
 }
 
 func (s *scheduler) Shutdown() error {
+	s.logger.Debug("scheduler shutting down")
+
 	s.shutdownCancel()
+	if !s.started.Load() {
+		return nil
+	}
 
 	t := time.NewTimer(s.exec.stopTimeout + 2*time.Second)
 	select {
 	case err := <-s.stopErrCh:
-
 		t.Stop()
 		return err
 	case <-t.C:
