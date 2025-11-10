@@ -4,3 +4,6 @@ build:
 install:
 	mkdir -p ${DESTDIR}/usr/bin
 	cp ${HOME}/go/bin/* ${DESTDIR}/usr/bin
+
+lint:
+	golangci-lint run ./...

@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -59,53 +60,13 @@ func NewGrpcClient(address string) (*Exporter, error) {
 	}, nil
 }
 
-func (e *Exporter) CollectDishStatus() *StarlinkGetStatusResponse {
-	req := &device.Request{
-		Request: &device.Request_GetStatus{},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-	resp, err := e.Client.Handle(ctx, req)
-	if err != nil {
-		fmt.Printf("gRPC GetStatus failed: %s", err.Error())
-		return nil
-	}
-
-	timestamp := time.Now().Format(time.RFC3339)
-
-	dishStatus := resp.GetDishGetStatus()
-	dishStatusResp := &StarlinkGetStatusResponse{
-		Timestamp:                     timestamp,
-		HardwareVersion:               dishStatus.DeviceInfo.GetHardwareVersion(),
-		SoftwareVersion:               dishStatus.DeviceInfo.GetSoftwareVersion(),
-		CountryCode:                   dishStatus.DeviceInfo.GetCountryCode(),
-		BuildID:                       dishStatus.DeviceInfo.GetBuildId(),
-		DeviceUptimeSeconds:           dishStatus.DeviceState.GetUptimeS(),
-		ObstructionFractionObstructed: dishStatus.ObstructionStats.GetFractionObstructed(),
-		ObstructionTimeObstructed:     dishStatus.ObstructionStats.GetTimeObstructed(),
-		DownlinkThroughputBps:         dishStatus.GetDownlinkThroughputBps(),
-		UplinkThroughputBps:           dishStatus.GetUplinkThroughputBps(),
-		PopPingLatencyMs:              dishStatus.GetPopPingLatencyMs(),
-		PhyRxBeamSnrAvg:               dishStatus.GetPhyRxBeamSnrAvg(),
-	}
-	return dishStatusResp
-}
-
 // struct get_status response
-type StarlinkGetStatusResponse struct {
-	Timestamp                     string
-	HardwareVersion               string
-	SoftwareVersion               string
-	CountryCode                   string
-	BuildID                       string
-	DeviceUptimeSeconds           uint64
-	ObstructionFractionObstructed float32
-	ObstructionTimeObstructed     float32
-	DownlinkThroughputBps         float32
-	UplinkThroughputBps           float32
-	PopPingLatencyMs              float32
-	PhyRxBeamSnrAvg               float32
+type StarlinkGetObstructionMapResponse struct {
+	Timestamp         string
+	MapReferenceFrame string
+	Rows              int
+	Cols              int
+	Data              []byte
 }
 
 func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapResponse {
@@ -132,8 +93,8 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 
 	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
 
-	for x := 0; x < cols; x++ {
-		for y := 0; y < rows; y++ {
+	for x := range cols {
+		for y := range rows {
 			snr := data[y*cols+x]
 			if snr > 1 {
 				// shouldn't happen
@@ -172,11 +133,18 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 	return dishObstructionMapResp
 }
 
-// struct get_status response
-type StarlinkGetObstructionMapResponse struct {
-	Timestamp         string
-	MapReferenceFrame string
-	Rows              int
-	Cols              int
-	Data              []byte
+func (e *Exporter) WriteObstructionMapImage(filename string) error {
+	obstructionMap := e.CollectDishObstructionMap()
+
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(obstructionMap.Data)
+	if err != nil {
+		return err
+	}
+	return nil
 }

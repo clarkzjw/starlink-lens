@@ -8,25 +8,28 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func getTimeString() string {
+func datetimeString() string {
 	return time.Now().UTC().Format("2006-01-02-15-04-05")
 }
 
-func checkInstalled() {
+func CheckDeps() error {
 	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "tar"}
+	if ENABLE_IRTT {
+		cmds = append(cmds, "irtt")
+	}
 	for _, c := range cmds {
 		if _, err := exec.LookPath(c); err != nil {
 			if _, err := os.Stat(c); err != nil {
-				log.Fatalf("%s is not installed", c)
+				return fmt.Errorf("%s is not installed", c)
 			}
 		}
 	}
+	return nil
 }
 
 func ipExist(ip string) bool {
@@ -97,33 +100,19 @@ func getExternalIP(IPVersion int) string {
 	}
 	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ifconfig.io").CombinedOutput()
 	if err != nil {
-		log.Println("get external IP failed: ", err)
+		log.Printf("get external IP%d addresses failed: %s", IPVersion, err)
 		log.Println("output: ", string(output))
 		return ""
 	}
 	return strings.Trim(string(output), "\n")
 }
 
-func getReverseDNS(ip string) string {
-	cmd := exec.Command("dig", "@1.1.1.1", "+short", "-x", ip)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Println(err)
-	}
-	return strings.Trim(string(output), "\n")
-}
-
-func getStarlinkPoP(rdns string) string {
-	// rdns: customer.sttlwax1.pop.starlinkisp.net.
-	// PoP: sttlwax1
-
-	regex := `^customer\.(?P<pop>[a-z0-9]+)\.pop\.starlinkisp\.net\.$`
-	re := regexp.MustCompile(regex)
-	match := re.FindStringSubmatch(rdns)
-	if len(match) == 0 {
+func getStarlinkPoP(ip string) string {
+	pop, ok := geoipClient.GetPopByCIDRFrom(ip)
+	if !ok {
 		return ""
 	}
-	return match[1]
+	return pop.Pop
 }
 
 type MTRResult struct {
@@ -171,50 +160,40 @@ func getStarlinkIPv6ActiveGateway() string {
 	return GW
 }
 
-func getInactiveIPv6PoP() string {
-	ifces, _ := net.Interfaces()
-	for _, iface := range ifces {
-		if iface.Name == IFACE {
-			addrs, _ := iface.Addrs()
-			for _, addr := range addrs {
-				ip, _, _ := net.ParseCIDR(addr.String())
-				pop := getStarlinkPoP(getReverseDNS(ip.String()))
-				if pop != "" {
-					return pop
-				}
+func getGateway() string {
+	gateway_ip := ""
+	external_ip := ""
+
+	if MANUAL_GW != "" {
+		if net.ParseIP(MANUAL_GW).To4() != nil {
+			IPVersion = 4
+		} else if len(net.ParseIP(MANUAL_GW)) == net.IPv6len {
+			IPVersion = 6
+		}
+		gateway_ip = MANUAL_GW
+	} else {
+		// Active dish, probe IPv6 active gateway through mtr or traceroute
+		external_ip6 = getExternalIP(6)
+		if ipExist(external_ip6) {
+			// If external IPv6 address exists on the interface
+			IPVersion = 6
+
+			log.Println("External IPv6: ", external_ip6)
+			external_ip = external_ip6
+			gateway_ip = getStarlinkIPv6ActiveGateway()
+		} else {
+			external_ip4 = getExternalIP(4)
+			if net.ParseIP(external_ip4).To4() != nil {
+				// CGNAT IPv4 does not exist on the interface locally
+				IPVersion = 4
+
+				log.Println("External IPv4: ", external_ip4)
+				external_ip = external_ip4
+				gateway_ip = defaultIPv4CGNATGateway
 			}
 		}
 	}
-	return ""
-}
 
-func getGateway() string {
-	// Inactive dish, return default IPv6 inactive gateway
-	// Router Bypass mode has to be set through the Starlink mobile app
-	if !ACTIVE {
-		PoP = getInactiveIPv6PoP()
-		return defaultIPv6InactiveGateway
-	}
-	if MANUAL_GW != "" {
-		return MANUAL_GW
-	}
-	// Active dish, probe IPv6 active gateway through mtr or traceroute
-	external_ip6 = getExternalIP(6)
-	external_ip4 = getExternalIP(4)
-	if ipExist(external_ip6) {
-		log.Println("External IPv6: ", external_ip6)
-		PoP = getStarlinkPoP(getReverseDNS(external_ip6))
-		IPVersion = 6
-		if GW6 != "fe80::200:5eff:fe00:101" {
-			return GW6
-		}
-		return getStarlinkIPv6ActiveGateway()
-	} else if net.ParseIP(external_ip4).To4() != nil {
-		log.Println("External IPv4: ", external_ip4)
-		PoP = getStarlinkPoP(getReverseDNS(external_ip4))
-		IPVersion = 4
-		return GW4
-	}
-	log.Fatal("GW not detected, get external IP failed")
-	return ""
+	PoP = getStarlinkPoP(external_ip)
+	return gateway_ip
 }
