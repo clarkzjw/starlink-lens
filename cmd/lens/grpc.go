@@ -60,57 +60,6 @@ func NewGrpcClient(address string) (*Exporter, error) {
 	}, nil
 }
 
-// func (e *Exporter) CollectDishStatus() *StarlinkGetStatusResponse {
-// 	req := &device.Request{
-// 		Request: &device.Request_GetStatus{},
-// 	}
-
-// 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-// 	defer cancel()
-// 	resp, err := e.Client.Handle(ctx, req)
-// 	if err != nil {
-// 		fmt.Printf("gRPC GetStatus failed: %s", err.Error())
-// 		return nil
-// 	}
-
-// 	timestamp := time.Now().Format(time.RFC3339)
-
-// 	dishStatus := resp.GetDishGetStatus()
-// 	dishStatusResp := &StarlinkGetStatusResponse{
-// 		Timestamp:                     timestamp,
-// 		HardwareVersion:               dishStatus.DeviceInfo.GetHardwareVersion(),
-// 		SoftwareVersion:               dishStatus.DeviceInfo.GetSoftwareVersion(),
-// 		CountryCode:                   dishStatus.DeviceInfo.GetCountryCode(),
-// 		BuildID:                       dishStatus.DeviceInfo.GetBuildId(),
-// 		DeviceUptimeSeconds:           dishStatus.DeviceState.GetUptimeS(),
-// 		ObstructionFractionObstructed: dishStatus.ObstructionStats.GetFractionObstructed(),
-// 		ObstructionTimeObstructed:     dishStatus.ObstructionStats.GetTimeObstructed(),
-// 		DownlinkThroughputBps:         dishStatus.GetDownlinkThroughputBps(),
-// 		UplinkThroughputBps:           dishStatus.GetUplinkThroughputBps(),
-// 		PopPingLatencyMs:              dishStatus.GetPopPingLatencyMs(),
-// 		PhyRxBeamSnrAvg:               dishStatus.GetPhyRxBeamSnrAvg(),
-// 	}
-// 	return dishStatusResp
-// }
-
-// struct get_status response
-//
-//	type StarlinkGetStatusResponse struct {
-//		Timestamp                     string
-//		HardwareVersion               string
-//		SoftwareVersion               string
-//		CountryCode                   string
-//		BuildID                       string
-//		DeviceUptimeSeconds           uint64
-//		ObstructionFractionObstructed float32
-//		ObstructionTimeObstructed     float32
-//		DownlinkThroughputBps         float32
-//		UplinkThroughputBps           float32
-//		PopPingLatencyMs              float32
-//		PhyRxBeamSnrAvg               float32
-//	}
-//
-
 // struct get_status response
 type StarlinkGetObstructionMapResponse struct {
 	Timestamp         string
