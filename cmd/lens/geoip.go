@@ -83,8 +83,8 @@ func NewGeoIPClient() *GeoIPClient {
 	return client
 }
 
-// GetPopByCIDRFromCsv returns the best-matching PopInfo for the given IP string
-func (g *GeoIPClient) GetPopByCIDRFrom(cidr string) (PopInfo, bool) {
+// GetPopByCIDR returns the best-matching PopInfo for the given IP string
+func (g *GeoIPClient) GetPopByCIDR(cidr string) (PopInfo, bool) {
 	if g == nil || len(g.CIDRMap) == 0 {
 		return PopInfo{}, false
 	}

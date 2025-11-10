@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/md5"
-	"fmt"
+	"encoding/hex"
 	"io"
 	"os"
 )
@@ -19,5 +19,5 @@ func checkFileMD5(filename string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }

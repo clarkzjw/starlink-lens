@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -19,7 +20,7 @@ func datetimeString() string {
 
 func CheckDeps() error {
 	cmds := []string{"ping", "mtr", "traceroute", "dig", "curl", "tar"}
-	if ENABLE_IRTT {
+	if EnableIRTT {
 		cmds = append(cmds, "irtt")
 	}
 	for _, c := range cmds {
@@ -33,7 +34,11 @@ func CheckDeps() error {
 }
 
 func ipExist(ip string) bool {
-	addrs, _ := net.InterfaceAddrs()
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Println("Error getting interface addresses: ", err)
+		return false
+	}
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To16() != nil {
@@ -48,7 +53,7 @@ func ipExist(ip string) bool {
 
 func checkDirectory() string {
 	today := time.Now().UTC().Format("2006-01-02")
-	err := os.MkdirAll(path.Join("data", today), os.ModePerm)
+	err := os.MkdirAll(path.Join("data", today), 0755)
 	if err != nil {
 		log.Println("Error creating directory: ", err)
 	}
@@ -66,7 +71,10 @@ func checkZstd() error {
 	}
 
 	cmd := exec.Command("tar", "--zstd")
-	output, _ := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("tar --zstd returned error: %s", err)
+	}
 	// Normally, when zstd is installed,
 	// tar --zstd
 	// tar: You must specify one of the '-Acdtrux', '--delete' or '--test-label' options
@@ -74,7 +82,7 @@ func checkZstd() error {
 	// return code is $? = 2
 	// no need to check err, but to check output whether zstd is supported by this version of tar
 	if strings.Contains(string(output), "unrecognized option") {
-		return fmt.Errorf("zstd is not supported")
+		return errors.New("zstd is not supported")
 	}
 	return nil
 }
@@ -88,19 +96,16 @@ func compress(directory, filename string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	return nil
+	return cmd.Run()
 }
 
-func getExternalIP(IPVersion int) string {
-	if IPVersion != 4 && IPVersion != 6 {
-		IPVersion = 6
+func getExternalIP(version int) string {
+	if version != 4 && version != 6 {
+		version = 6
 	}
-	output, err := exec.Command("curl", fmt.Sprintf("-%d", IPVersion), "-m", "5", "-s", "--interface", IFACE, "ifconfig.io").CombinedOutput()
+	output, err := exec.Command("curl", fmt.Sprintf("-%d", version), "-m", "5", "-s", "--interface", Iface, "ifconfig.io").CombinedOutput()
 	if err != nil {
-		log.Printf("get external IP%d addresses failed: %s", IPVersion, err)
+		log.Printf("get external IP%d addresses failed: %s", version, err)
 		log.Println("output: ", string(output))
 		return ""
 	}
@@ -108,7 +113,7 @@ func getExternalIP(IPVersion int) string {
 }
 
 func getStarlinkPoP(ip string) string {
-	pop, ok := geoipClient.GetPopByCIDRFrom(ip)
+	pop, ok := geoipClient.GetPopByCIDR(ip)
 	if !ok {
 		return ""
 	}
@@ -126,74 +131,85 @@ type MTRResult struct {
 
 func getStarlinkIPv6ActiveGateway() string {
 	fmt.Println("Getting Starlink IPv6 active gateway")
-	cmd, err := exec.Command("mtr", "ipv6.google.com", "-n", "-m", IPv6GWHop, "-I", IFACE, "-c", "1", "--json").CombinedOutput()
+	cmd, err := exec.Command("mtr", "ipv6.google.com", "-n", "-m", IPv6GatewayHopCount, "-I", Iface, "-c", "1", "--json").CombinedOutput()
 	if err != nil {
-		log.Panic(err)
+		log.Println("mtr failed: ", err)
+		return ""
 	}
 
 	var mtrOutput MTRResult
 	err = json.Unmarshal([]byte(string(cmd)), &mtrOutput)
 	if err != nil {
 		log.Println("Error unmarshalling mtr output: ", err)
+		return ""
 	}
 
 	for _, h := range mtrOutput.Report.Hubs {
-		if strconv.Itoa(h.Count) == IPv6GWHop {
+		if strconv.Itoa(h.Count) == IPv6GatewayHopCount {
 			return h.Host
 		}
 	}
 
-	fmt.Println("GW not detected using mtr")
-	fmt.Println("Trying traceroute")
+	log.Println("GW not detected using mtr")
+	log.Println("Trying traceroute")
 
-	output, err := exec.Command("traceroute", "-6", "-i", IFACE, "ipv6.google.com", "-n", "-m", IPv6GWHop, "-f", IPv6GWHop, "-q", "1").CombinedOutput()
+	output, err := exec.Command("traceroute",
+		"-6",
+		"-i", Iface,
+		"ipv6.google.com",
+		"-n",
+		"-m", IPv6GatewayHopCount,
+		"-f", IPv6GatewayHopCount,
+		"-q", "1").CombinedOutput()
 	if err != nil {
-		log.Panic(err)
+		log.Printf("traceroute failed: %s", err)
+		return ""
 	}
 	tracerouteResult := ""
 	tracerouteResult = string(output)
-	GW := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
-	GW = strings.Split(GW, " ")[3]
-	if GW == "*" || net.ParseIP(GW).To16() == nil {
-		log.Fatal("traceroute failed")
+	gateway := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
+	gateway = strings.Split(gateway, " ")[3]
+	if gateway == "*" || net.ParseIP(gateway).To16() == nil {
+		log.Printf("traceroute failed")
+		return ""
 	}
-	return GW
+	return gateway
 }
 
 func getGateway() string {
-	gateway_ip := ""
-	external_ip := ""
+	gatewayIP := ""
+	externalIP := ""
 
-	if MANUAL_GW != "" {
-		if net.ParseIP(MANUAL_GW).To4() != nil {
+	if ManualSpecifiedGateway != "" {
+		if net.ParseIP(ManualSpecifiedGateway).To4() != nil {
 			IPVersion = 4
-		} else if len(net.ParseIP(MANUAL_GW)) == net.IPv6len {
+		} else if len(net.ParseIP(ManualSpecifiedGateway)) == net.IPv6len {
 			IPVersion = 6
 		}
-		gateway_ip = MANUAL_GW
+		gatewayIP = ManualSpecifiedGateway
 	} else {
 		// Active dish, probe IPv6 active gateway through mtr or traceroute
-		external_ip6 = getExternalIP(6)
-		if ipExist(external_ip6) {
+		externalIPv6 = getExternalIP(6)
+		if ipExist(externalIPv6) {
 			// If external IPv6 address exists on the interface
 			IPVersion = 6
 
-			log.Println("External IPv6: ", external_ip6)
-			external_ip = external_ip6
-			gateway_ip = getStarlinkIPv6ActiveGateway()
+			log.Println("External IPv6:", externalIPv6)
+			externalIP = externalIPv6
+			gatewayIP = getStarlinkIPv6ActiveGateway()
 		} else {
-			external_ip4 = getExternalIP(4)
-			if net.ParseIP(external_ip4).To4() != nil {
+			externalIPv4 = getExternalIP(4)
+			if net.ParseIP(externalIPv4).To4() != nil {
 				// CGNAT IPv4 does not exist on the interface locally
 				IPVersion = 4
 
-				log.Println("External IPv4: ", external_ip4)
-				external_ip = external_ip4
-				gateway_ip = defaultIPv4CGNATGateway
+				log.Println("External IPv4: ", externalIPv4)
+				externalIP = externalIPv4
+				gatewayIP = defaultIPv4CGNATGateway
 			}
 		}
 	}
 
-	PoP = getStarlinkPoP(external_ip)
-	return gateway_ip
+	PoP = getStarlinkPoP(externalIP)
+	return gatewayIP
 }

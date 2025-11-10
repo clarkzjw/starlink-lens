@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -12,16 +13,16 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	device "github.com/clarkzjw/starlink-grpc-golang/pkg/spacex.com/api/device"
+	"github.com/clarkzjw/starlink-grpc-golang/pkg/spacex.com/api/device"
 	"github.com/pbnjay/pixfont"
 )
 
 var (
 	defaultDishAddress = "192.168.100.1:9200"
 	grpcTimeout        = 5 * time.Second
-	GRPC_ADDR_PORT     string
-	DURATION           string
-	DATA_DIR           string
+	GRPCAddrPort       string
+	Duration           string
+	DataDir            string
 	FPS                int
 )
 
@@ -53,12 +54,12 @@ func NewGrpcClient(address string) (*Exporter, error) {
 		Request: &device.Request_GetDeviceInfo{},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("gRPC GetDeviceInfo failed: %s", err.Error())
+		return nil, errors.New("gRPC GetDeviceInfo failed: " + err.Error())
 	}
 
 	deviceInfo := resp.GetGetDeviceInfo().GetDeviceInfo()
 	if deviceInfo == nil {
-		return nil, fmt.Errorf("gRPC GetDeviceInfo failed: deviceInfo is nil")
+		return nil, errors.New("gRPC GetDeviceInfo failed: deviceInfo is nil")
 	}
 
 	return &Exporter{
