@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
@@ -13,10 +15,10 @@ func getTimeString() string {
 	return time.Now().UTC().Format("2006-01-02-15-04-05")
 }
 
-func createVideo(dataDir string, fps int) {
+func createVideo(dataDir string, fps int) error {
 	videoFile := fmt.Sprintf("%s/obstruction-map-video-%s.mp4", dataDir, getTimeString())
 	cmd := exec.Command("ffmpeg",
-		"-framerate", fmt.Sprintf("%d", fps),
+		"-framerate", strconv.Itoa(fps),
 		"-pattern_type", "glob",
 		"-i", fmt.Sprintf("%s/*.png", dataDir),
 		"-c:v", "libx264",
@@ -25,16 +27,16 @@ func createVideo(dataDir string, fps int) {
 	)
 	stdout, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("Failed to create video: %s\nOutput: %s", err.Error(), stdout)
-		return
+		return errors.New("failed to create video: " + err.Error() + " output: " + string(stdout))
 	}
 	fmt.Printf("Video created: %s\n", videoFile)
+	return nil
 }
 
 func main() {
-	flag.StringVar(&GRPC_ADDR_PORT, "addr_port", defaultDishAddress, "gRPC address and port of the Starlink dish")
-	flag.StringVar(&DURATION, "duration", "10s", "Duration for the obstruction map video")
-	flag.StringVar(&DATA_DIR, "data_dir", "./obstructionMapData", "Directory to save the obstruction map frames")
+	flag.StringVar(&GRPCAddrPort, "addr_port", defaultDishAddress, "gRPC address and port of the Starlink dish")
+	flag.StringVar(&Duration, "duration", "10s", "Duration for the obstruction map video")
+	flag.StringVar(&DataDir, "data_dir", "./obstructionMapData", "Directory to save the obstruction map frames")
 	flag.IntVar(&FPS, "fps", 10, "Frames per second for the video")
 	flag.Parse()
 
@@ -42,13 +44,13 @@ func main() {
 		log.Fatal("ffmpeg is not installed. Please install ffmpeg to create videos.")
 	}
 
-	fmt.Printf("Using gRPC address: %s\n", GRPC_ADDR_PORT)
-	fmt.Printf("Duration for video: %s\n", DURATION)
+	fmt.Printf("Using gRPC address: %s\n", GRPCAddrPort)
+	fmt.Printf("Duration for video: %s\n", Duration)
 
-	if GRPC_ADDR_PORT == "" {
-		GRPC_ADDR_PORT = defaultDishAddress
+	if GRPCAddrPort == "" {
+		GRPCAddrPort = defaultDishAddress
 	}
-	durationSecond, err := time.ParseDuration(DURATION)
+	durationSecond, err := time.ParseDuration(Duration)
 	if err != nil {
 		fmt.Printf("Error parsing duration: %s\n", err)
 		return
@@ -56,16 +58,16 @@ func main() {
 	fmt.Printf("Duration in seconds: %.0f\n", durationSecond.Seconds())
 
 	startTime := getTimeString()
-	DATA_DIR = fmt.Sprintf("%s/%s", DATA_DIR, startTime)
+	DataDir = fmt.Sprintf("%s/%s", DataDir, startTime)
 
-	if _, err := os.Stat(DATA_DIR); os.IsNotExist(err) {
-		err = os.MkdirAll(DATA_DIR, 0640)
+	if _, err := os.Stat(DataDir); os.IsNotExist(err) {
+		err = os.MkdirAll(DataDir, 0640)
 		if err != nil {
 			log.Fatalf("Error creating data directory: %s\n", err)
 		}
 	}
 
-	grpcClient, err := NewGrpcClient(GRPC_ADDR_PORT)
+	grpcClient, err := NewGrpcClient(GRPCAddrPort)
 	if err != nil {
 		log.Println("Error creating gRPC client: ", err)
 		return
@@ -82,7 +84,7 @@ func main() {
 		}
 
 		datetime := getTimeString()
-		filename := fmt.Sprintf("%s/obstruction-map-%s.png", DATA_DIR, datetime)
+		filename := fmt.Sprintf("%s/obstruction-map-%s.png", DataDir, datetime)
 		fmt.Printf("Saving obstruction map to %s\n", filename)
 		f, err := os.Create(filename)
 		if err != nil {
@@ -97,5 +99,8 @@ func main() {
 		time.Sleep(time.Second * 1)
 	}
 
-	createVideo(DATA_DIR, FPS)
+	if err := createVideo(DataDir, FPS); err != nil {
+		log.Println("Error creating video: ", err)
+		return
+	}
 }

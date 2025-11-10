@@ -21,10 +21,10 @@ func init() {
 	flag.Parse()
 
 	if *getObstructionMap {
-		if DISH_GRPC_ADDR_PORT == "" {
-			DISH_GRPC_ADDR_PORT = defaultDishGRPCAddress
+		if DishGrpcAddrPort == "" {
+			DishGrpcAddrPort = defaultDishGRPCAddress
 		}
-		grpcClient, err := NewGrpcClient(DISH_GRPC_ADDR_PORT)
+		grpcClient, err := NewGrpcClient(DishGrpcAddrPort)
 		if err != nil {
 			log.Fatal("Error creating gRPC client: ", err)
 		}
@@ -46,58 +46,67 @@ func init() {
 }
 
 func main() {
-	if IFACE == "" {
+	if Iface == "" {
 		log.Fatal("IFACE is not set")
 	}
 
-	fmt.Printf("Starlink Gateway: %s\n", STARLINK_GATEWAY)
-	fmt.Printf("DURATION: %s\n", DURATION)
-	fmt.Printf("INTERVAL: %s\n", INTERVAL)
-	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
-	fmt.Printf("IFACE: %s\n", IFACE)
-	fmt.Printf("COUNT: %d\n", COUNT)
+	fmt.Printf("Starlink Gateway: %s\n", StarlinkGateway)
+	fmt.Printf("DURATION: %s\n", Duration)
+	fmt.Printf("INTERVAL: %s\n", Interval)
+	fmt.Printf("INTERVAL_SEC: %.2f\n", IntervalSeconds)
+	fmt.Printf("IFACE: %s\n", Iface)
+	fmt.Printf("COUNT: %d\n", Count)
 	fmt.Printf("PoP: %s\n\n", PoP)
 
 	s, err := gocron.NewScheduler()
 	if err != nil {
 		log.Fatal("Error creating scheduler: ", err)
 	}
-	defer func() { _ = s.Shutdown() }()
+	defer func() {
+		if err := s.Shutdown(); err != nil {
+			log.Printf("Error shutting down scheduler: %v", err)
+		}
+	}()
 
 	_, err = s.NewJob(
 		gocron.CronJob(
-			CRON,
+			CronString,
 			false,
 		),
 		gocron.NewTask(
-			icmp_ping,
-			STARLINK_GATEWAY,
-			INTERVAL_SEC,
+			ICMPPing,
+			StarlinkGateway,
+			IntervalSeconds,
 		),
 	)
 	if err != nil {
-		log.Fatal("Error creating icmp_ping job: ", err)
+		log.Printf("Error creating icmp_ping job: %s", err.Error())
+		return
 	}
 
-	if ENABLE_IRTT {
+	if EnableIRTT {
 		_, err = s.NewJob(
 			gocron.CronJob(
-				CRON,
+				CronString,
 				false,
 			),
 			gocron.NewTask(
-				irtt_ping,
+				IRTTPing,
 			),
 		)
 		if err != nil {
-			log.Fatal("Error creating irtt_ping job: ", err)
+			log.Printf("Error creating irtt_ping job: %s", err.Error())
+			return
 		}
 	}
 
 	s.Start()
 
 	for _, j := range s.Jobs() {
-		t, _ := j.NextRun()
+		t, err := j.NextRun()
+		if err != nil {
+			log.Printf("Error getting next run time for job %s: %s", j.Name(), err.Error())
+		}
 
 		fmt.Printf("[%s] Next run: %s\n", j.Name(), t)
 	}
