@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -10,34 +9,32 @@ import (
 )
 
 var (
-	defaultDishAddress         = "192.168.100.1:9200"
-	grpcTimeout                = 5 * time.Second
-	defaultIPv4CGNATGateway    = "100.64.0.1"
-	defaultIPv6InactiveGateway = "fe80::200:5eff:fe00:101"
-	duration                   time.Duration
-	external_ip4               string
-	external_ip6               string
+	defaultDishGRPCAddress  = "192.168.100.1:9200"
+	grpcTimeout             = 5 * time.Second
+	defaultIPv4CGNATGateway = "100.64.0.1"
+	duration                time.Duration
+	external_ip4            string
+	external_ip6            string
 
-	CLIENT_NAME    string
-	GW4            string
-	GW6            string
-	MANUAL_GW      string
-	DURATION       string
-	INTERVAL       string
-	INTERVAL_SEC   float64
-	IFACE          string
-	COUNT          int
-	ACTIVE         bool
-	IPv6GWHop      string
-	CRON           string
-	DATA_DIR       string
-	IRTT_HOST_PORT string
-	LOCAL_IP       string
-	PoP            string
-	IPVersion      int
-	ENABLE_IRTT    = false
+	CLIENT_NAME      string
+	STARLINK_GATEWAY string
+	MANUAL_GW        string
+	DURATION         string
+	INTERVAL         string
+	INTERVAL_SEC     float64
+	IFACE            string
+	COUNT            int
+	ACTIVE           bool
+	IPv6GWHop        string
+	CRON             string
+	DATA_DIR         string
+	IRTT_HOST_PORT   string
+	LOCAL_IP         string
+	PoP              string
+	IPVersion        int
+	ENABLE_IRTT      = false
 
-	GRPC_ADDR_PORT string
+	DISH_GRPC_ADDR_PORT string
 
 	ENABLE_SYNC  = false
 	NOTIFY_URL   string
@@ -54,6 +51,14 @@ var (
 	S3_BUCKET_NAME string
 	S3_ACCESS_KEY  string
 	S3_SECRET_KEY  string
+
+	ENABLE_SWIFT    = false
+	SWIFT_USERNAME  string
+	SWIFT_APIKEY    string
+	SWIFT_AUTHURL   string
+	SWIFT_DOMAIN    string
+	SWIFT_TENANT    string
+	SWIFT_CONTAINER string
 )
 
 func getConfigFromEnv() error {
@@ -62,12 +67,10 @@ func getConfigFromEnv() error {
 		return fmt.Errorf("error loading .env file: %v", err)
 	}
 
-	GRPC_ADDR_PORT = os.Getenv("GRPC_ADDR_PORT")
-	if GRPC_ADDR_PORT == "" {
-		GRPC_ADDR_PORT = defaultDishAddress
+	DISH_GRPC_ADDR_PORT = os.Getenv("DISH_GRPC_ADDR_PORT")
+	if DISH_GRPC_ADDR_PORT == "" {
+		DISH_GRPC_ADDR_PORT = defaultDishGRPCAddress
 	}
-	GW4 = os.Getenv("GW4")
-	GW6 = os.Getenv("GW6")
 	MANUAL_GW = os.Getenv("MANUAL_GW")
 	DURATION = os.Getenv("DURATION")
 	INTERVAL = os.Getenv("INTERVAL")
@@ -98,35 +101,45 @@ func getConfigFromEnv() error {
 	S3_ACCESS_KEY = os.Getenv("S3_ACCESS_KEY")
 	S3_SECRET_KEY = os.Getenv("S3_SECRET_KEY")
 
+	ENABLE_SWIFT = os.Getenv("ENABLE_SWIFT") == "true"
+	SWIFT_USERNAME = os.Getenv("SWIFT_USERNAME")
+	SWIFT_APIKEY = os.Getenv("SWIFT_APIKEY")
+	SWIFT_AUTHURL = os.Getenv("SWIFT_AUTHURL")
+	SWIFT_DOMAIN = os.Getenv("SWIFT_DOMAIN")
+	SWIFT_TENANT = os.Getenv("SWIFT_TENANT")
+	SWIFT_CONTAINER = os.Getenv("SWIFT_CONTAINER")
 	return nil
 }
 
-func GetConfig() {
+func LoadConfig() error {
 	if err := getConfigFromEnv(); err != nil {
-		log.Fatal(err)
+		return err
+	}
+
+	STARLINK_GATEWAY = getGateway()
+	if STARLINK_GATEWAY == "" {
+		//lint:ignore ST1005 Starlink is a proper noun
+		return fmt.Errorf("Starlink gateway not detected")
 	}
 
 	if ENABLE_IRTT && IRTT_HOST_PORT == "" {
-		log.Fatal("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
-	}
-
-	var GW string
-	if MANUAL_GW != "" {
-		GW4 = MANUAL_GW
-		GW6 = MANUAL_GW
-	} else {
-		GW = getGateway()
-		if GW == "" {
-			log.Fatal("GW not detected")
-		}
+		return fmt.Errorf("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
 	}
 
 	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {
-		log.Fatal("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
+		return fmt.Errorf("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
+	}
+
+	if ENABLE_SWIFT {
+		if err := test_swift_connection(); err != nil {
+			return fmt.Errorf("swift connection test failed: %v", err)
+		}
 	}
 
 	duration, _ = time.ParseDuration(DURATION)
 	interval, _ := time.ParseDuration(INTERVAL)
 	COUNT = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
 	INTERVAL_SEC = interval.Seconds()
+
+	return nil
 }

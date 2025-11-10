@@ -16,7 +16,12 @@ func icmp_ping(target string, interval float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 
 	today := checkDirectory()
-	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, datetimeString())
+	var filename string
+	if PoP != "" {
+		filename = fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, INTERVAL, DURATION, datetimeString())
+	} else {
+		filename = fmt.Sprintf("ping-%s-%s-%s-%s.txt", target, INTERVAL, DURATION, datetimeString())
+	}
 	filename_full := path.Join("data", today, filename)
 
 	go func(ctx context.Context) {
@@ -46,8 +51,27 @@ func icmp_ping(target string, interval float64) {
 		log.Println(err)
 	}
 
-	if ENABLE_S3 {
-		upload_to_s3(filename_full+".tar.zst", path.Join(CLIENT_NAME, "ping", strconv.Itoa(time.Now().Year()), today))
+	if ENABLE_SWIFT {
+		swift_client, err := new_swift_client(SWIFT_USERNAME, SWIFT_APIKEY, SWIFT_AUTHURL, SWIFT_DOMAIN, CLIENT_NAME)
+		if err != nil {
+			log.Println("Error creating Swift client: ", err)
+			return
+		}
+		local_filename := filename_full + ".tar.zst"
+
+		year := strconv.Itoa(time.Now().Year())
+		month := fmt.Sprintf("%02d", time.Now().Month())
+		day := fmt.Sprintf("%02d", time.Now().Day())
+
+		target_filename := path.Join(CLIENT_NAME, "ping", year, month, day, path.Base(local_filename))
+		if err := upload_to_swift(swift_client, SWIFT_CONTAINER, local_filename, target_filename); err != nil {
+			log.Println("Error uploading to Swift: ", err)
+		}
+		defer func() {
+			if err := os.Remove(local_filename); err != nil {
+				log.Println("Error removing local file: ", err)
+			}
+		}()
 	}
 }
 
@@ -79,7 +103,26 @@ func irtt_ping() {
 
 	<-ctx.Done()
 
-	if ENABLE_S3 {
-		upload_to_s3(filename_full, path.Join(CLIENT_NAME, "irtt", strconv.Itoa(time.Now().Year()), today))
+	if ENABLE_SWIFT {
+		swift_client, err := new_swift_client(SWIFT_USERNAME, SWIFT_APIKEY, SWIFT_AUTHURL, SWIFT_DOMAIN, CLIENT_NAME)
+		if err != nil {
+			log.Println("Error creating Swift client: ", err)
+			return
+		}
+		local_filename := filename_full + ".tar.zst"
+
+		year := strconv.Itoa(time.Now().Year())
+		month := fmt.Sprintf("%02d", time.Now().Month())
+		day := fmt.Sprintf("%02d", time.Now().Day())
+
+		target_filename := path.Join(CLIENT_NAME, "irtt", year, month, day, path.Base(local_filename))
+		if err := upload_to_swift(swift_client, SWIFT_CONTAINER, local_filename, target_filename); err != nil {
+			log.Println("Error uploading to Swift: ", err)
+		}
+		defer func() {
+			if err := os.Remove(local_filename); err != nil {
+				log.Println("Error removing local file: ", err)
+			}
+		}()
 	}
 }

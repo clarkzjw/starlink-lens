@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	swift "github.com/ncw/swift/v2"
 )
 
 func sync_data() {
@@ -105,5 +106,61 @@ func upload_to_s3(local_path string, remote_prefix string) {
 	}
 
 	log.Printf("Successfully uploaded %s to s3://%s/%s\n", local_path, S3_BUCKET_NAME, remote_key)
+}
 
+func new_swift_client(username, apiKey, authURL, domain, tenant string) (*swift.Connection, error) {
+	conn := swift.Connection{
+		UserName: username,
+		ApiKey:   apiKey,
+		AuthUrl:  authURL,
+		Domain:   domain,
+		Tenant:   tenant,
+	}
+	err := conn.Authenticate(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate Swift client: %v", err)
+	}
+	return &conn, nil
+}
+
+func test_swift_connection() error {
+	conn, err := new_swift_client(SWIFT_USERNAME, SWIFT_APIKEY, SWIFT_AUTHURL, SWIFT_DOMAIN, SWIFT_TENANT)
+	if err != nil {
+		return err
+	}
+
+	containers, err := conn.ContainerNames(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to list Swift containers: %v", err)
+	}
+
+	log.Println("Swift containers:")
+	for _, container := range containers {
+		log.Println(" - ", container)
+	}
+	return nil
+}
+
+func upload_to_swift(conn *swift.Connection, containerName, localPath, targetPath string) error {
+	if conn == nil {
+		return fmt.Errorf("swift connection is nil")
+	}
+
+	file, err := os.Open(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to open local file %s: %v", localPath, err)
+	}
+	defer file.Close()
+
+	md5sum, err := checkFileMD5(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to calculate MD5 checksum for %s: %v", localPath, err)
+	}
+	fmt.Printf("MD5 checksum of %s: %s\n", localPath, md5sum)
+	headers, err := conn.ObjectPut(context.Background(), containerName, targetPath, file, true, md5sum, "", nil)
+	if err != nil {
+		return fmt.Errorf("failed to upload file %s to Swift: %v", localPath, err)
+	}
+	fmt.Printf("Successfully uploaded %s to container %s as %s\nHeaders: %v", localPath, containerName, targetPath, headers)
+	return nil
 }

@@ -107,6 +107,9 @@ github.com/joho/godotenv
 # github.com/jonboulle/clockwork v0.5.0
 ## explicit; go 1.21
 github.com/jonboulle/clockwork
+# github.com/ncw/swift/v2 v2.0.5
+## explicit; go 1.16
+github.com/ncw/swift/v2
 # github.com/pbnjay/pixfont v0.0.0-20200714042608-33b744692567
 ## explicit; go 1.13
 github.com/pbnjay/pixfont

@@ -10,6 +10,8 @@ import (
 
 var (
 	getObstructionMap *bool
+
+	geoipClient *GeoIPClient
 )
 
 func init() {
@@ -18,16 +20,11 @@ func init() {
 
 	flag.Parse()
 
-	GetConfig()
-	CheckPkgsInstalled()
-}
-
-func main() {
 	if *getObstructionMap {
-		if GRPC_ADDR_PORT == "" {
-			GRPC_ADDR_PORT = defaultDishAddress
+		if DISH_GRPC_ADDR_PORT == "" {
+			DISH_GRPC_ADDR_PORT = defaultDishGRPCAddress
 		}
-		grpcClient, err := NewGrpcClient(GRPC_ADDR_PORT)
+		grpcClient, err := NewGrpcClient(DISH_GRPC_ADDR_PORT)
 		if err != nil {
 			log.Fatal("Error creating gRPC client: ", err)
 		}
@@ -37,12 +34,23 @@ func main() {
 		}
 	}
 
+	geoipClient = NewGeoIPClient()
+
+	if err := LoadConfig(); err != nil {
+		log.Fatal("Error loading config: ", err)
+	}
+
+	if err := CheckDeps(); err != nil {
+		log.Fatal("Error checking dependency packages: ", err)
+	}
+}
+
+func main() {
 	if IFACE == "" {
 		log.Fatal("IFACE is not set")
 	}
 
-	fmt.Printf("GW4: %s\n", GW4)
-	fmt.Printf("GW6: %s\n", GW6)
+	fmt.Printf("Starlink Gateway: %s\n", STARLINK_GATEWAY)
 	fmt.Printf("DURATION: %s\n", DURATION)
 	fmt.Printf("INTERVAL: %s\n", INTERVAL)
 	fmt.Printf("INTERVAL_SEC: %.2f\n", INTERVAL_SEC)
@@ -63,7 +71,7 @@ func main() {
 		),
 		gocron.NewTask(
 			icmp_ping,
-			getGateway(),
+			STARLINK_GATEWAY,
 			INTERVAL_SEC,
 		),
 	)
@@ -83,21 +91,6 @@ func main() {
 		)
 		if err != nil {
 			log.Fatal("Error creating irtt_ping job: ", err)
-		}
-	}
-
-	if ENABLE_SYNC {
-		_, err = s.NewJob(
-			gocron.CronJob(
-				SYNC_CRON,
-				false,
-			),
-			gocron.NewTask(
-				sync_data,
-			),
-		)
-		if err != nil {
-			log.Fatal("Error creating sync_data job: ", err)
 		}
 	}
 
