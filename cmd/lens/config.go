@@ -13,7 +13,7 @@ var (
 	defaultDishGRPCAddress  = "192.168.100.1:9200"
 	grpcTimeout             = 5 * time.Second
 	defaultIPv4CGNATGateway = "100.64.0.1"
-	duration                time.Duration
+	sessionDuration         time.Duration
 	externalIPv4            string
 	externalIPv6            string
 
@@ -138,7 +138,8 @@ func LoadConfig() error {
 		}
 	}
 
-	duration, err := time.ParseDuration(Duration)
+	var err error
+	sessionDuration, err = time.ParseDuration(Duration)
 	if err != nil {
 		return fmt.Errorf("error parsing Duration: %w", err)
 	}
@@ -146,7 +147,7 @@ func LoadConfig() error {
 	if err != nil {
 		return fmt.Errorf("error parsing Interval: %w", err)
 	}
-	Count = int(duration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
+	Count = int(sessionDuration.Seconds() / (float64(interval.Microseconds()) / 1000.0 / 1000.0))
 	IntervalSeconds = interval.Seconds()
 
 	return nil

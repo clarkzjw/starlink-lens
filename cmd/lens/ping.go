@@ -13,7 +13,8 @@ import (
 )
 
 func ICMPPing(target string, interval float64) {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	ctx, cancel := context.WithTimeout(context.Background(), sessionDuration)
+	defer cancel()
 
 	today := checkDirectory()
 	var filename string
@@ -24,86 +25,61 @@ func ICMPPing(target string, interval float64) {
 	}
 	fullFilename := path.Join("data", today, filename)
 
-	// channels to communicate process and exit
-	procCh := make(chan *os.Process, 1)
-	doneCh := make(chan struct{})
+	cmd := exec.Command("ping", "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
+	log.Println(cmd.String())
 
+	f, err := os.Create(fullFilename)
+	if err != nil {
+		log.Println("Error creating ping output file: ", err)
+		return
+	}
+	defer f.Close()
+
+	mw := io.MultiWriter(f)
+	cmd.Stdout = mw
+	cmd.Stderr = mw
+
+	if err := cmd.Start(); err != nil {
+		log.Println("Error starting ping process: ", err)
+		return
+	}
+
+	fmt.Printf("Started ping process (PID %d) for target %s\n", cmd.Process.Pid, target)
+
+	waitErr := make(chan error)
 	go func() {
-		// ensure context is cancelled when goroutine (process) finishes
-		defer cancel()
-
-		cmd := exec.Command("ping", "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
-		log.Println(cmd.String())
-
-		f, err := os.Create(fullFilename)
-		if err != nil {
-			log.Println("Error creating ping output file: ", err)
-			return
-		}
-		defer f.Close()
-
-		mw := io.MultiWriter(f)
-		cmd.Stdout = mw
-		cmd.Stderr = mw
-
-		// start the process (do not tie to ctx so we can send signals manually)
-		if err := cmd.Start(); err != nil {
-			log.Println("Error starting ping process: ", err)
-			return
-		}
-
-		// publish process to caller
-		procCh <- cmd.Process
-
-		// wait for process to exit
-		if err := cmd.Wait(); err != nil {
-			log.Println(err)
-		}
-
-		// signal done
-		close(doneCh)
+		waitErr <- cmd.Wait()
+		close(waitErr)
 	}()
 
-	// wait for either process start or context done
 	select {
+	case err := <-waitErr:
+		if err != nil {
+			log.Println(err)
+		}
 	case <-ctx.Done():
-		// context finished before process was published or already done; try to see if proc arrived
-		select {
-		case proc := <-procCh:
-			if proc != nil {
-				// try polite interrupt first
-				if err := proc.Signal(os.Interrupt); err != nil {
-					log.Printf("Error sending interrupt to ping process: %v", err)
+		if cmd.Process != nil {
+			if err := cmd.Process.Signal(os.Interrupt); err != nil {
+				log.Printf("Error sending interrupt to ping process: %v", err)
+				if err := cmd.Process.Kill(); err != nil {
+					log.Printf("Error killing ping process: %v", err)
 				} else {
-					// give process some time to exit
-					select {
-					case <-doneCh:
-						// exited gracefully
-					case <-time.After(5 * time.Second):
-						// still running: kill
-						if err := proc.Kill(); err != nil {
-							log.Printf("Error killing ping process: %v", err)
-						}
+					if err := <-waitErr; err != nil {
+						log.Println(err)
 					}
 				}
-			}
-		default:
-			// no process to signal
-		}
-	case proc := <-procCh:
-		// process started; now wait for ctx done
-		<-ctx.Done()
-		// attempt graceful shutdown
-		if proc != nil {
-			if err := proc.Signal(os.Interrupt); err != nil {
-				log.Printf("Error sending interrupt to ping process: %v", err)
 			} else {
 				select {
-				case <-doneCh:
-					// exited
+				case err := <-waitErr:
+					if err != nil {
+						log.Println(err)
+					}
 				case <-time.After(5 * time.Second):
-					if err := proc.Kill(); err != nil {
+					if err := cmd.Process.Kill(); err != nil {
 						log.Printf("Error killing ping process: %v", err)
+					}
+					if err := <-waitErr; err != nil {
+						log.Println(err)
 					}
 				}
 			}
@@ -125,8 +101,9 @@ func ICMPPing(target string, interval float64) {
 		year := strconv.Itoa(time.Now().Year())
 		month := fmt.Sprintf("%02d", time.Now().Month())
 		day := time.Now().UTC().Format("2006-01-02")
-
 		targetFilename := path.Join(ClientName, "ping", year, month, day, path.Base(localFilename))
+		fmt.Printf("Uploading to Swift: %s\n", targetFilename)
+
 		if err := UploadToSwift(conn, SwiftContainer, localFilename, targetFilename); err != nil {
 			log.Println("Error uploading to Swift: ", err)
 		}
@@ -139,7 +116,7 @@ func ICMPPing(target string, interval float64) {
 }
 
 func IRTTPing() {
-	ctx, cancel := context.WithTimeout(context.Background(), duration+time.Minute*10)
+	ctx, cancel := context.WithTimeout(context.Background(), sessionDuration+time.Minute*10)
 
 	today := checkDirectory()
 
