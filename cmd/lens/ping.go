@@ -24,10 +24,15 @@ func ICMPPing(target string, interval float64) {
 	}
 	fullFilename := path.Join("data", today, filename)
 
-	go func(ctx context.Context) {
+	// channels to communicate process and exit
+	procCh := make(chan *os.Process, 1)
+	doneCh := make(chan struct{})
+
+	go func() {
+		// ensure context is cancelled when goroutine (process) finishes
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, "ping", "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
+		cmd := exec.Command("ping", "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
 		log.Println(cmd.String())
 
 		f, err := os.Create(fullFilename)
@@ -38,16 +43,73 @@ func ICMPPing(target string, interval float64) {
 		defer f.Close()
 
 		mw := io.MultiWriter(f)
-
 		cmd.Stdout = mw
 		cmd.Stderr = mw
 
-		if err := cmd.Run(); err != nil {
+		// start the process (do not tie to ctx so we can send signals manually)
+		if err := cmd.Start(); err != nil {
+			log.Println("Error starting ping process: ", err)
+			return
+		}
+
+		// publish process to caller
+		procCh <- cmd.Process
+
+		// wait for process to exit
+		if err := cmd.Wait(); err != nil {
 			log.Println(err)
 		}
-	}(ctx)
 
-	<-ctx.Done()
+		// signal done
+		close(doneCh)
+	}()
+
+	// wait for either process start or context done
+	select {
+	case <-ctx.Done():
+		// context finished before process was published or already done; try to see if proc arrived
+		select {
+		case proc := <-procCh:
+			if proc != nil {
+				// try polite interrupt first
+				if err := proc.Signal(os.Interrupt); err != nil {
+					log.Printf("Error sending interrupt to ping process: %v", err)
+				} else {
+					// give process some time to exit
+					select {
+					case <-doneCh:
+						// exited gracefully
+					case <-time.After(5 * time.Second):
+						// still running: kill
+						if err := proc.Kill(); err != nil {
+							log.Printf("Error killing ping process: %v", err)
+						}
+					}
+				}
+			}
+		default:
+			// no process to signal
+		}
+	case proc := <-procCh:
+		// process started; now wait for ctx done
+		<-ctx.Done()
+		// attempt graceful shutdown
+		if proc != nil {
+			if err := proc.Signal(os.Interrupt); err != nil {
+				log.Printf("Error sending interrupt to ping process: %v", err)
+			} else {
+				select {
+				case <-doneCh:
+					// exited
+				case <-time.After(5 * time.Second):
+					if err := proc.Kill(); err != nil {
+						log.Printf("Error killing ping process: %v", err)
+					}
+				}
+			}
+		}
+	}
+
 	if err := compress(path.Join(DataDir, today), filename); err != nil {
 		log.Println(err)
 	}
