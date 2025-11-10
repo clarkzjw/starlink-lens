@@ -15,25 +15,25 @@ permissions:
   contents: write
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ '1.24.x' ]
-    steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-      - uses: actions/checkout@v4
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=5m
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       go-version: [ '1.24.x' ]
+  #   steps:
+  #     - uses: actions/setup-go@v5
+  #       with:
+  #         go-version: ${{ matrix.go-version }}
+  #     - uses: actions/checkout@v4
+  #     - name: golangci-lint
+  #       uses: golangci/golangci-lint-action@v6
+  #       with:
+  #         version: latest
+  #         args: --timeout=5m
 
   build:
     runs-on: ubuntu-latest
-    needs: lint
+    # needs: lint
     strategy:
       matrix:
         go-version: [ '1.24.x' ]

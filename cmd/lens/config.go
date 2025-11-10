@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -64,7 +65,7 @@ var (
 func getConfigFromEnv() error {
 	err := godotenv.Load()
 	if err != nil {
-		return fmt.Errorf("error loading .env file: %v", err)
+		return fmt.Errorf("error loading .env file: %w", err)
 	}
 
 	DISH_GRPC_ADDR_PORT = os.Getenv("DISH_GRPC_ADDR_PORT")
@@ -119,20 +120,20 @@ func LoadConfig() error {
 	STARLINK_GATEWAY = getGateway()
 	if STARLINK_GATEWAY == "" {
 		//lint:ignore ST1005 Starlink is a proper noun
-		return fmt.Errorf("Starlink gateway not detected")
+		return errors.New("Starlink gateway not detected")
 	}
 
 	if ENABLE_IRTT && IRTT_HOST_PORT == "" {
-		return fmt.Errorf("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
+		return errors.New("IRTT_HOST_PORT is not set when ENABLE_IRTT is true")
 	}
 
 	if ENABLE_IRTT && IPVersion == 4 && LOCAL_IP == "" {
-		return fmt.Errorf("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
+		return errors.New("LOCAL_IP is not set when ENABLE_IRTT is true and IPv4 is used")
 	}
 
 	if ENABLE_SWIFT {
 		if err := test_swift_connection(); err != nil {
-			return fmt.Errorf("swift connection test failed: %v", err)
+			return fmt.Errorf("swift connection test failed: %w", err)
 		}
 	}
 

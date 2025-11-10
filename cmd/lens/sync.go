@@ -148,18 +148,18 @@ func upload_to_swift(conn *swift.Connection, containerName, localPath, targetPat
 
 	file, err := os.Open(localPath)
 	if err != nil {
-		return fmt.Errorf("failed to open local file %s: %v", localPath, err)
+		return fmt.Errorf("failed to open local file %s: %w", localPath, err)
 	}
 	defer file.Close()
 
 	md5sum, err := checkFileMD5(localPath)
 	if err != nil {
-		return fmt.Errorf("failed to calculate MD5 checksum for %s: %v", localPath, err)
+		return fmt.Errorf("failed to calculate MD5 checksum for %s: %w", localPath, err)
 	}
 	fmt.Printf("MD5 checksum of %s: %s\n", localPath, md5sum)
 	headers, err := conn.ObjectPut(context.Background(), containerName, targetPath, file, true, md5sum, "", nil)
 	if err != nil {
-		return fmt.Errorf("failed to upload file %s to Swift: %v", localPath, err)
+		return fmt.Errorf("failed to upload file %s to Swift: %w", localPath, err)
 	}
 	fmt.Printf("Successfully uploaded %s to container %s as %s\nHeaders: %v\n", localPath, containerName, targetPath, headers)
 	return nil

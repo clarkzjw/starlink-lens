@@ -59,7 +59,7 @@ func main() {
 	DATA_DIR = fmt.Sprintf("%s/%s", DATA_DIR, startTime)
 
 	if _, err := os.Stat(DATA_DIR); os.IsNotExist(err) {
-		err = os.MkdirAll(DATA_DIR, 0755)
+		err = os.MkdirAll(DATA_DIR, 0640)
 		if err != nil {
 			log.Fatalf("Error creating data directory: %s\n", err)
 		}
@@ -84,12 +84,16 @@ func main() {
 		datetime := getTimeString()
 		filename := fmt.Sprintf("%s/obstruction-map-%s.png", DATA_DIR, datetime)
 		fmt.Printf("Saving obstruction map to %s\n", filename)
-		f, _ := os.Create(filename)
-		defer f.Close()
+		f, err := os.Create(filename)
+		if err != nil {
+			log.Println("Error creating obstruction map file: ", err)
+			return
+		}
 		_, err = f.Write(obstructionMap.Data)
 		if err != nil {
 			log.Println("Error writing obstruction map: ", err)
 		}
+		f.Close()
 		time.Sleep(time.Second * 1)
 	}
 

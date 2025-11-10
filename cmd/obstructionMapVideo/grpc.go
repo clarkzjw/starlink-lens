@@ -97,7 +97,6 @@ func (e *Exporter) CollectDishStatus() *StarlinkGetStatusResponse {
 		DownlinkThroughputBps:         dishStatus.GetDownlinkThroughputBps(),
 		UplinkThroughputBps:           dishStatus.GetUplinkThroughputBps(),
 		PopPingLatencyMs:              dishStatus.GetPopPingLatencyMs(),
-		PhyRxBeamSnrAvg:               dishStatus.GetPhyRxBeamSnrAvg(),
 	}
 	return dishStatusResp
 }
