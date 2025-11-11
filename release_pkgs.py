@@ -251,13 +251,36 @@ def parse_args():
         "--deb-based-releases",
         default=[
             "any",
+            # debian
+            # 13
             "trixie",
+            # 12
             "bookworm",
+            # 11
             "bullseye",
+            # ubuntu
+            # 24.04
             "noble",
+            # 22.04
             "jammy",
+            # 20.04
             "focal",
+            # 18.04
             "bionic",
+            # 16.04
+            "xenial",
+            # 14.04
+            "trusty",
+            # 25.10
+            "questing",
+            # 25.04
+            "plucky",
+            # 24.10
+            "oracular",
+            # 23.10
+            "mantic",
+            # 23.04
+            "lunar",
         ],
         help="list of debian based releases that need to be packaged for",
     )
