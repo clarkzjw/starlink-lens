@@ -127,11 +127,44 @@ func getStarlinkPoP(ip string) string {
 	return pop.Pop
 }
 
+// IntOrString is a helper to unmarshal JSON that may provide an integer
+// either as a number or as a quoted string.
+type IntOrString int
+
+func (i *IntOrString) UnmarshalJSON(b []byte) error {
+	// handle null/empty
+	s := strings.TrimSpace(string(b))
+	if s == "" || s == "null" {
+		*i = 0
+		return nil
+	}
+	// If it's a quoted string, trim quotes
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		s = strings.Trim(s, "\"")
+	}
+	// Try parse as integer from string form
+	if v, err := strconv.Atoi(s); err == nil {
+		*i = IntOrString(v)
+		return nil
+	}
+	// Fallback: try decoding as json.Number (handles numeric tokens)
+	var num json.Number
+	if err := json.Unmarshal(b, &num); err == nil {
+		if iv, err := num.Int64(); err == nil {
+			*i = IntOrString(iv)
+			return nil
+		}
+	}
+	return fmt.Errorf("IntOrString: cannot unmarshal %s", string(b))
+}
+
 type MTRResult struct {
 	Report struct {
 		Hubs []struct {
-			Count int    `json:"count"`
-			Host  string `json:"host"`
+			// mtr 0.93 uses "count" as string
+			// mtr 0.95 uses "count" as integer
+			Count IntOrString `json:"count"`
+			Host  string      `json:"host"`
 		}
 	}
 }
@@ -152,7 +185,7 @@ func getStarlinkIPv6ActiveGateway() string {
 	}
 
 	for _, h := range mtrOutput.Report.Hubs {
-		if strconv.Itoa(h.Count) == IPv6GatewayHopCount {
+		if strconv.Itoa(int(h.Count)) == IPv6GatewayHopCount {
 			return h.Host
 		}
 	}
