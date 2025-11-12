@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/phuslu/log"
 )
 
 func ICMPPing(target string, interval float64) {
@@ -26,11 +27,11 @@ func ICMPPing(target string, interval float64) {
 	fullFilename := path.Join("data", today, filename)
 
 	cmd := exec.Command("ping", "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
-	log.Println(cmd.String())
+	log.Info().Msgf("ping command: %s", cmd.String())
 
 	f, err := os.Create(fullFilename)
 	if err != nil {
-		log.Println("Error creating ping output file: ", err)
+		log.Error().Err(err).Msg("Error creating ping output file")
 		return
 	}
 	defer f.Close()
@@ -40,11 +41,11 @@ func ICMPPing(target string, interval float64) {
 	cmd.Stderr = mw
 
 	if err := cmd.Start(); err != nil {
-		log.Println("Error starting ping process: ", err)
+		log.Error().Err(err).Msg("Error starting ping process")
 		return
 	}
 
-	fmt.Printf("Started ping process (PID %d) for target %s\n", cmd.Process.Pid, target)
+	log.Info().Msgf("Started ping process (PID %d) for target %s", cmd.Process.Pid, target)
 
 	waitErr := make(chan error)
 	go func() {
@@ -55,7 +56,7 @@ func ICMPPing(target string, interval float64) {
 	select {
 	case err := <-waitErr:
 		if err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("Ping process exited with error")
 		}
 	case <-ctx.Done():
 		if cmd.Process != nil {
@@ -65,21 +66,21 @@ func ICMPPing(target string, interval float64) {
 					log.Printf("Error killing ping process: %v", err)
 				} else {
 					if err := <-waitErr; err != nil {
-						log.Println(err)
+						log.Error().Err(err).Msg("Ping process exited with error after kill")
 					}
 				}
 			} else {
 				select {
 				case err := <-waitErr:
 					if err != nil {
-						log.Println(err)
+						log.Error().Err(err).Msg("Ping process exited with error after interrupt")
 					}
 				case <-time.After(5 * time.Second):
 					if err := cmd.Process.Kill(); err != nil {
 						log.Printf("Error killing ping process: %v", err)
 					}
 					if err := <-waitErr; err != nil {
-						log.Println(err)
+						log.Error().Err(err).Msg("Ping process exited with error after kill")
 					}
 				}
 			}
@@ -87,14 +88,14 @@ func ICMPPing(target string, interval float64) {
 	}
 
 	if err := compress(path.Join(DataDir, today), filename); err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Error compressing ping output file")
 		return
 	}
 
 	if EnableSwift {
 		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, SwiftTenant)
 		if err != nil {
-			log.Println("Error creating Swift client: ", err)
+			log.Error().Err(err).Msg("Error creating Swift client")
 			return
 		}
 		localFilename := fullFilename + ".tar.zst"
@@ -103,17 +104,19 @@ func ICMPPing(target string, interval float64) {
 		month := fmt.Sprintf("%02d", time.Now().Month())
 		day := time.Now().UTC().Format("2006-01-02")
 		targetFilename := path.Join(ClientName, "ping", year, month, day, path.Base(localFilename))
-		fmt.Printf("Uploading to Swift: %s\n", targetFilename)
+		log.Info().Msgf("Uploading %s to Swift: %s", localFilename, targetFilename)
 
 		if err := UploadToSwift(conn, SwiftContainer, localFilename, targetFilename); err != nil {
-			log.Println("Error uploading to Swift: ", err)
+			log.Error().Err(err).Msgf("Error uploading %s to Swift container %s", localFilename, SwiftContainer)
 		}
 		defer func() {
 			if err := os.Remove(localFilename); err != nil {
-				log.Println("Error removing local file: ", err)
+				log.Error().Err(err).Msgf("Error removing local file %s", localFilename)
 			}
 		}()
 	}
+
+	notify()
 }
 
 func IRTTPing() {
@@ -144,10 +147,10 @@ func IRTTPing() {
 			local,
 			IRTTHostPort,
 			"-o", fullFilename)
-		log.Println(cmd.String())
+		log.Info().Msgf("irtt command: %s", cmd.String())
 
 		if err := cmd.Run(); err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("Error running irtt command")
 		}
 	}(ctx)
 
@@ -156,7 +159,7 @@ func IRTTPing() {
 	if EnableSwift {
 		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, ClientName)
 		if err != nil {
-			log.Println("Error creating Swift client: ", err)
+			log.Error().Err(err).Msg("Error creating Swift client")
 			return
 		}
 		localFilename := fullFilename + ".tar.zst"
@@ -167,12 +170,14 @@ func IRTTPing() {
 
 		targetFilename := path.Join(ClientName, "irtt", year, month, day, path.Base(localFilename))
 		if err := UploadToSwift(conn, SwiftContainer, localFilename, targetFilename); err != nil {
-			log.Println("Error uploading to Swift: ", err)
+			log.Error().Err(err).Msgf("Error uploading %s to Swift container %s", localFilename, SwiftContainer)
 		}
 		defer func() {
 			if err := os.Remove(localFilename); err != nil {
-				log.Println("Error removing local file: ", err)
+				log.Error().Err(err).Msgf("Error removing local file %s", localFilename)
 			}
 		}()
 	}
+
+	notify()
 }
