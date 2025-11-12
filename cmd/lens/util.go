@@ -218,6 +218,8 @@ func getGateway() string {
 
 	PoP = getStarlinkPoP(externalIP)
 	StarlinkGateway = gatewayIP
+
+	log.Info().Msgf("Starlink gateway: %s, PoP: %s, external IP: %s", gatewayIP, PoP, externalIP)
 	return gatewayIP
 }
 
