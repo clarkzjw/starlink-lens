@@ -15,6 +15,8 @@ var (
 )
 
 func init() {
+	log.DefaultLogger.SetLevel(log.InfoLevel)
+
 	log.Info().Msg("Starlink LENS")
 	getObstructionMap = flag.Bool("map", false, "Get obstruction map")
 

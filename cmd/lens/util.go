@@ -74,16 +74,13 @@ func checkZstd() error {
 
 	cmd := exec.Command("tar", "--zstd")
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("tar --zstd returned error: %s", err)
-	}
 	// Normally, when zstd is installed,
 	// tar --zstd
 	// tar: You must specify one of the '-Acdtrux', '--delete' or '--test-label' options
 	// Try 'tar --help' or 'tar --usage' for more information.
 	// return code is $? = 2
 	// no need to check err, but to check output whether zstd is supported by this version of tar
-	if strings.Contains(string(output), "unrecognized option") {
+	if err != nil && strings.Contains(string(output), "unrecognized option") {
 		return errors.New("zstd is not supported")
 	}
 	return nil
@@ -171,7 +168,7 @@ func getStarlinkIPv6ActiveGateway() string {
 		"-f", IPv6GatewayHopCount,
 		"-q", "1").CombinedOutput()
 	if err != nil {
-		log.Printf("traceroute failed: %s", err)
+		log.Error().Err(err).Msgf("traceroute failed: %s", string(output))
 		return ""
 	}
 	tracerouteResult := ""
@@ -179,7 +176,7 @@ func getStarlinkIPv6ActiveGateway() string {
 	gateway := strings.Split(tracerouteResult, "\n")[len(strings.Split(tracerouteResult, "\n"))-2]
 	gateway = strings.Split(gateway, " ")[3]
 	if gateway == "*" || net.ParseIP(gateway).To16() == nil {
-		log.Printf("traceroute failed")
+		log.Error().Msg("traceroute failed to get gateway")
 		return ""
 	}
 	return gateway
