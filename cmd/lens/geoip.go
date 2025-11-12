@@ -105,7 +105,7 @@ func NewGeoIPClient() *GeoIPClient {
 	return client
 }
 
-// check current time and compare with PopCsvLastUpdated, if more than 12 hours, re-download, and update PopCsvLastUpdated
+// UpdatePoPCsv check current time and compare with PopCsvLastUpdated, if more than 12 hours, re-download, and update PopCsvLastUpdated
 func (g *GeoIPClient) UpdatePoPCsv() {
 	if g == nil {
 		return
