@@ -58,11 +58,11 @@ func UploadToSwift(conn *swift.Connection, containerName, localPath, targetPath 
 	if err != nil {
 		return fmt.Errorf("failed to calculate MD5 checksum for %s: %w", localPath, err)
 	}
-	fmt.Printf("MD5 checksum of %s: %s\n", localPath, md5sum)
+	log.Debug().Msgf("MD5 checksum of %s: %s", localPath, md5sum)
 	headers, err := conn.ObjectPut(context.Background(), containerName, targetPath, file, true, md5sum, "", nil)
 	if err != nil {
 		return fmt.Errorf("failed to upload file %s to Swift: %w", localPath, err)
 	}
-	fmt.Printf("Successfully uploaded %s to container %s as %s\nHeaders: %v\n", localPath, containerName, targetPath, headers)
+	log.Debug().Msgf("Successfully uploaded %s to container %s as %s\nHeaders: %v\n", localPath, containerName, targetPath, headers)
 	return nil
 }

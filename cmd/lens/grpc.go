@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/clarkzjw/starlink-grpc-golang/pkg/spacex.com/api/device"
+	"github.com/phuslu/log"
 )
 
 type Exporter struct {
@@ -79,7 +80,7 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 	defer cancel()
 	resp, err := e.Client.Handle(ctx, req)
 	if err != nil {
-		fmt.Printf("gRPC GetObstructionMap failed: %s", err.Error())
+		log.Fatal().Err(err).Msg("gRPC GetObstructionMap failed")
 		return nil
 	}
 
@@ -119,7 +120,7 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 	// Encode the image to PNG format in a buffer
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		fmt.Printf("Failed to encode image: %s", err.Error())
+		log.Fatal().Err(err).Msg("Failed to encode image")
 		return nil
 	}
 
