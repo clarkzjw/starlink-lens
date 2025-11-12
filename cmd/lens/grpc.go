@@ -80,7 +80,7 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 	defer cancel()
 	resp, err := e.Client.Handle(ctx, req)
 	if err != nil {
-		log.Fatal().Err(err).Msg("gRPC GetObstructionMap failed")
+		log.Error().Err(err).Msg("gRPC GetObstructionMap failed")
 		return nil
 	}
 
@@ -120,7 +120,7 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 	// Encode the image to PNG format in a buffer
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		log.Fatal().Err(err).Msg("Failed to encode image")
+		log.Error().Err(err).Msg("Failed to encode image")
 		return nil
 	}
 
@@ -137,6 +137,9 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 
 func (e *Exporter) WriteObstructionMapImage(filename string) error {
 	obstructionMap := e.CollectDishObstructionMap()
+	if obstructionMap == nil {
+		return errors.New("failed to collect obstruction map")
+	}
 
 	f, err := os.Create(filename)
 	if err != nil {

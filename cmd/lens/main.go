@@ -82,7 +82,8 @@ func main() {
 		),
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error creating icmp_ping job")
+		log.Error().Err(err).Msg("Error creating icmp_ping job")
+		return
 	}
 
 	if EnableIRTT {
@@ -96,7 +97,8 @@ func main() {
 			),
 		)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error creating irtt_ping job")
+			log.Error().Err(err).Msg("Error creating irtt_ping job")
+			return
 		}
 	}
 
