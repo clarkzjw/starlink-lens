@@ -217,6 +217,7 @@ func getGateway() string {
 	}
 
 	PoP = getStarlinkPoP(externalIP)
+	StarlinkGateway = gatewayIP
 	return gatewayIP
 }
 

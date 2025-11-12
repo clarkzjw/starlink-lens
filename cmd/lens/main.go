@@ -72,6 +72,20 @@ func main() {
 
 	_, err = s.NewJob(
 		gocron.CronJob(
+			"30 * * * *",
+			false,
+		),
+		gocron.NewTask(
+			getGateway,
+		),
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("Error creating getGateway job")
+		return
+	}
+
+	_, err = s.NewJob(
+		gocron.CronJob(
 			CronString,
 			false,
 		),
