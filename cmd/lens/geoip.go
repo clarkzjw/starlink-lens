@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,8 @@ type PopInfo struct {
 }
 
 type GeoIPClient struct {
+	mu sync.RWMutex
+
 	PopCsvLastUpdated int64
 
 	// map from cidr -> PopInfo
@@ -34,34 +37,27 @@ const (
 // 14.1.67.0/24,mnlaphl1,mnl
 // 14.1.72.0/24,mlbeaus1,mel
 
-// NewGeoIPClient creates a GeoIPClient, downloads the CSV from PopCsvUrl,
-// parses lines of the form cidr,pop,city and stores them in CIDRMap.
-// On success PopCsvLastUpdated is set to the current Unix timestamp.
-// On any error an empty client is returned (PopCsvLastUpdated == 0).
-func NewGeoIPClient() *GeoIPClient {
-	client := &GeoIPClient{
-		CIDRMap: make(map[string]PopInfo),
-	}
-
+// fetchPoPCsv downloads and parses the POP CSV, returning the map on success.
+func fetchPoPCsv() (map[string]PopInfo, error) {
 	resp, err := http.Get(popCsvURL)
 	if err != nil {
-		return client
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return client
+		return nil, err
 	}
 
 	r := csv.NewReader(resp.Body)
+	newMap := make(map[string]PopInfo)
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			// parse error -> return what we have (empty map)
-			return client
+			return nil, err
 		}
 		if len(record) < 3 {
 			continue
@@ -72,15 +68,69 @@ func NewGeoIPClient() *GeoIPClient {
 		if cidr == "" {
 			continue
 		}
-		client.CIDRMap[cidr] = PopInfo{
+		newMap[cidr] = PopInfo{
 			CIDR: cidr,
 			Pop:  pop,
 			City: city,
 		}
 	}
+	return newMap, nil
+}
 
-	client.PopCsvLastUpdated = time.Now().Unix()
+// NewGeoIPClient creates a GeoIPClient, downloads the CSV from PopCsvUrl,
+// parses lines of the form cidr,pop,city and stores them in CIDRMap.
+// On success PopCsvLastUpdated is set to the current Unix timestamp.
+// On any error an empty client is returned (PopCsvLastUpdated == 0).
+func NewGeoIPClient() *GeoIPClient {
+	client := &GeoIPClient{
+		CIDRMap: make(map[string]PopInfo),
+	}
+
+	// attempt initial download once
+	if newMap, err := fetchPoPCsv(); err == nil {
+		client.mu.Lock()
+		client.CIDRMap = newMap
+		client.PopCsvLastUpdated = time.Now().Unix()
+		client.mu.Unlock()
+	}
+
+	go func(c *GeoIPClient) {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			c.UpdatePoPCsv()
+		}
+	}(client)
+
 	return client
+}
+
+// check current time and compare with PopCsvLastUpdated, if more than 12 hours, re-download, and update PopCsvLastUpdated
+func (g *GeoIPClient) UpdatePoPCsv() {
+	if g == nil {
+		return
+	}
+
+	now := time.Now().Unix()
+
+	g.mu.RLock()
+	last := g.PopCsvLastUpdated
+	g.mu.RUnlock()
+
+	// if updated within 12 hours, nothing to do
+	if now-last < 3600 {
+		return
+	}
+
+	newMap, err := fetchPoPCsv()
+	if err != nil {
+		return
+	}
+
+	g.mu.Lock()
+	g.CIDRMap = newMap
+	g.PopCsvLastUpdated = time.Now().Unix()
+	g.mu.Unlock()
 }
 
 // GetPopByCIDR returns the best-matching PopInfo for the given IP string
