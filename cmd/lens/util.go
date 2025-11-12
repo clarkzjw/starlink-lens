@@ -155,7 +155,7 @@ func (i *IntOrString) UnmarshalJSON(b []byte) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("IntOrString: cannot unmarshal %s", string(b))
+	return fmt.Errorf("cannot unmarshal %s", string(b))
 }
 
 type MTRResult struct {
