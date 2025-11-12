@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 
 	"github.com/go-co-op/gocron/v2"
+	"github.com/phuslu/log"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	log.Println("Starlink Lens")
+	log.Info().Msg("Starlink LENS")
 	getObstructionMap = flag.Bool("map", false, "Get obstruction map")
 
 	flag.Parse()
@@ -26,45 +26,45 @@ func init() {
 		}
 		grpcClient, err := NewGrpcClient(DishGrpcAddrPort)
 		if err != nil {
-			log.Fatal("Error creating gRPC client: ", err)
+			log.Fatal().Err(err).Msg("Error creating gRPC client")
 		}
 		filename := fmt.Sprintf("obstruction-map-%s.png", datetimeString())
 		if err := grpcClient.WriteObstructionMapImage(filename); err != nil {
-			log.Fatal("Error writing obstruction map image: ", err)
+			log.Fatal().Err(err).Msg("Error writing obstruction map image")
 		}
 	}
 
 	geoipClient = NewGeoIPClient()
 
 	if err := LoadConfig(); err != nil {
-		log.Fatal("Error loading config: ", err)
+		log.Fatal().Err(err).Msg("Error loading config")
 	}
 
 	if err := CheckDeps(); err != nil {
-		log.Fatal("Error checking dependency packages: ", err)
+		log.Fatal().Err(err).Msg("Error checking dependency packages")
 	}
 }
 
 func main() {
 	if Iface == "" {
-		log.Fatal("IFACE is not set")
+		log.Fatal().Msg("IFACE is not set")
 	}
 
-	fmt.Printf("Starlink Gateway: %s\n", StarlinkGateway)
-	fmt.Printf("DURATION: %s\n", Duration)
-	fmt.Printf("INTERVAL: %s\n", Interval)
-	fmt.Printf("INTERVAL_SEC: %.2f\n", IntervalSeconds)
-	fmt.Printf("IFACE: %s\n", Iface)
-	fmt.Printf("COUNT: %d\n", Count)
-	fmt.Printf("PoP: %s\n\n", PoP)
+	log.Info().Msgf("Starlink Gateway: %s", StarlinkGateway)
+	log.Info().Msgf("DURATION: %s", Duration)
+	log.Info().Msgf("INTERVAL: %s", Interval)
+	log.Info().Msgf("INTERVAL_SEC: %.2f", IntervalSeconds)
+	log.Info().Msgf("IFACE: %s", Iface)
+	log.Info().Msgf("COUNT: %d", Count)
+	log.Info().Msgf("PoP: %s", PoP)
 
 	s, err := gocron.NewScheduler()
 	if err != nil {
-		log.Fatal("Error creating scheduler: ", err)
+		log.Fatal().Err(err).Msg("Error creating scheduler")
 	}
 	defer func() {
 		if err := s.Shutdown(); err != nil {
-			log.Printf("Error shutting down scheduler: %v", err)
+			log.Fatal().Err(err).Msg("Error shutting down scheduler")
 		}
 	}()
 
@@ -80,8 +80,7 @@ func main() {
 		),
 	)
 	if err != nil {
-		log.Printf("Error creating icmp_ping job: %s", err.Error())
-		return
+		log.Fatal().Err(err).Msg("Error creating icmp_ping job")
 	}
 
 	if EnableIRTT {
@@ -95,8 +94,7 @@ func main() {
 			),
 		)
 		if err != nil {
-			log.Printf("Error creating irtt_ping job: %s", err.Error())
-			return
+			log.Fatal().Err(err).Msg("Error creating irtt_ping job")
 		}
 	}
 
@@ -105,10 +103,10 @@ func main() {
 	for _, j := range s.Jobs() {
 		t, err := j.NextRun()
 		if err != nil {
-			log.Printf("Error getting next run time for job %s: %s", j.Name(), err.Error())
+			log.Warn().Err(err).Msgf("Error getting next run time for job %s", j.Name())
 		}
 
-		fmt.Printf("[%s] Next run: %s\n", j.Name(), t)
+		log.Info().Msgf("Next run for job %s: %s", j.Name(), t)
 	}
 
 	select {}
