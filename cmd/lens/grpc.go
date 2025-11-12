@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -69,6 +70,29 @@ type StarlinkGetObstructionMapResponse struct {
 	Rows              int
 	Cols              int
 	Data              []byte
+}
+
+func (e *Exporter) CollectIPv6WanAddress() string {
+	req := &device.Request{
+		Request: &device.Request_GetStatus{},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	resp, err := e.Client.Handle(ctx, req)
+	if err != nil {
+		log.Error().Err(err).Msg("gRPC GetStatus failed")
+		return ""
+	}
+	wifiGetStatus := resp.GetWifiGetStatus()
+	ipv6WanAddresses := wifiGetStatus.GetIpv6WanAddresses()
+	var ipv6WanAddress string
+	for _, addr := range ipv6WanAddresses {
+		if !strings.HasPrefix(addr, "fe80::") {
+			ipv6WanAddress = addr
+			break
+		}
+	}
+	return ipv6WanAddress
 }
 
 func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapResponse {

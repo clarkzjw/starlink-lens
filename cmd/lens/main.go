@@ -10,8 +10,7 @@ import (
 
 var (
 	getObstructionMap *bool
-
-	geoipClient *GeoIPClient
+	geoipClient       *GeoIPClient
 )
 
 func init() {

@@ -35,23 +35,11 @@ var (
 	IPVersion              int
 	EnableIRTT             = false
 
-	DishGrpcAddrPort string
+	DishGrpcAddrPort   string
+	RouterGrpcAddrPort string
 
-	EnableSync  = false
-	NotifyURL   string
-	SyncServer  string
-	SyncUser    string
-	SyncKey     string
-	SyncPath    string
-	SyncCron    string
-	SSHPassPath string
-
-	EnableS3     = false
-	S3Region     string
-	S3Endpoint   string
-	S3BucketName string
-	S3AccessKey  string
-	S3SecretKey  string
+	EnableSync = false
+	NotifyURL  string
 
 	EnableSwift    = false
 	SwiftUsername  string
@@ -72,6 +60,7 @@ func getConfigFromEnv() error {
 	if DishGrpcAddrPort == "" {
 		DishGrpcAddrPort = defaultDishGRPCAddress
 	}
+	RouterGrpcAddrPort = os.Getenv("ROUTER_GRPC_ADDR_PORT")
 	ManualSpecifiedGateway = os.Getenv("MANUAL_GW")
 	Duration = os.Getenv("DURATION")
 	Interval = os.Getenv("INTERVAL")
@@ -88,19 +77,6 @@ func getConfigFromEnv() error {
 
 	EnableSync = os.Getenv("ENABLE_SYNC") == "true"
 	NotifyURL = os.Getenv("NOTIFY_URL")
-	SyncServer = os.Getenv("SYNC_SERVER")
-	SyncUser = os.Getenv("SYNC_USER")
-	SyncKey = os.Getenv("SYNC_KEY")
-	SyncPath = os.Getenv("SYNC_PATH")
-	SyncCron = os.Getenv("SYNC_CRON")
-	SSHPassPath = os.Getenv("SSHPASS_PATH")
-
-	EnableS3 = os.Getenv("ENABLE_S3") == "true"
-	S3Region = os.Getenv("S3_REGION")
-	S3Endpoint = os.Getenv("S3_ENDPOINT")
-	S3BucketName = os.Getenv("S3_BUCKET_NAME")
-	S3AccessKey = os.Getenv("S3_ACCESS_KEY")
-	S3SecretKey = os.Getenv("S3_SECRET_KEY")
 
 	EnableSwift = os.Getenv("ENABLE_SWIFT") == "true"
 	SwiftUsername = os.Getenv("SWIFT_USERNAME")
