@@ -64,5 +64,5 @@ nfpms:
 
 dockers:
   - image_templates:
-      - "docker.io/clarkzjw/lens"
+      - "docker.io/clarkzjw/starlink-lens"
     skip_push: true

@@ -78,9 +78,9 @@ jobs:
         id: push_docker_images
         run: |
           docker login docker.io -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWORD }}"
-          docker push clarkzjw/lens:latest
-          docker tag clarkzjw/lens:latest clarkzjw/lens:${{ env.SOURCE_TAG }}
-          docker push clarkzjw/lens:${{ env.SOURCE_TAG }}
+          docker push clarkzjw/starlink-lens:latest
+          docker tag clarkzjw/starlink-lens:latest clarkzjw/starlink-lens:${{ env.SOURCE_TAG }}
+          docker push clarkzjw/starlink-lens:${{ env.SOURCE_TAG }}
 
       - name: Upload packages to Cloudflare R2
         id: upload-r2-apt
