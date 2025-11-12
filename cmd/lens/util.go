@@ -196,24 +196,24 @@ func getGateway() string {
 	} else if !ActiveDish {
 		// With the rollout of standby mode, there are fewer inactive dishes.
 		// Inactive dishes cannot reach the Internet, but they can reach 100.64.0.1 or 198.54.100.0 (pop.anycast.starlinkisp.net).
-		// If there is a connected Starlink router, then it still gets a IPv6 WAN address, which has corresponding PoP information.
 		exporter, err := NewGrpcClient(RouterGrpcAddrPort)
 		if err != nil {
 			log.Error().Err(err).Msg("Error creating gRPC client to Starlink router")
 			return defaultIPv4CGNATGateway
 		}
 		ipv6WanAddress := exporter.CollectIPv6WanAddress()
-		if net.ParseIP(ipv6WanAddress).To16() != nil {
-			IPVersion = 6
-			_, net, err := net.ParseCIDR(ipv6WanAddress)
-			if err != nil {
-				log.Error().Err(err).Msg("Error parsing IPv6 WAN address CIDR")
-				return defaultIPv4CGNATGateway
-			}
-			gatewayIP = net.IP.String()
-			externalIP = ipv6WanAddress
-			log.Info().Msgf("External IPv6 address from Starlink router: %s, gateway IP: %s", externalIP, gatewayIP)
+		log.Info().Msgf("IPv6 WAN CIDR from Starlink router: %s", ipv6WanAddress)
+		_, net, err := net.ParseCIDR(ipv6WanAddress)
+		if err != nil {
+			log.Error().Err(err).Msg("Error parsing IPv6 WAN address CIDR")
+			return defaultIPv4CGNATGateway
 		}
+		IPVersion = 6
+		// technically, this is not the external IP, but we use it to get the PoP info
+		externalIP = net.IP.String()
+		// we still use the default CGNAT gateway for inactive dish
+		gatewayIP = defaultIPv4CGNATGateway
+		log.Info().Msgf("External IPv6 address from Starlink router: %s, gateway IP: %s", externalIP, gatewayIP)
 	} else {
 		// Active dish, probe IPv6 active gateway through mtr or traceroute
 		externalIPv6 = getExternalIP(6)
