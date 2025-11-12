@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	http "github.com/hashicorp/go-retryablehttp"
 )
 
 func datetimeString() string {
@@ -221,4 +223,21 @@ func getGateway() string {
 
 	PoP = getStarlinkPoP(externalIP)
 	return gatewayIP
+}
+
+func notify() {
+	if NotifyURL == "" {
+		return
+	}
+	client := http.NewClient()
+	client.HTTPClient.Timeout = 10 * time.Second
+	client.RetryMax = 3
+
+	resp, err := client.Get(NotifyURL)
+	if err != nil {
+		log.Println("Error sending notify request: ", err)
+		return
+	}
+	defer resp.Body.Close()
+	log.Println("Notify response status: ", resp.Status)
 }

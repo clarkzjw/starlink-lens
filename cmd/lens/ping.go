@@ -114,6 +114,8 @@ func ICMPPing(target string, interval float64) {
 			}
 		}()
 	}
+
+	notify()
 }
 
 func IRTTPing() {
@@ -175,4 +177,6 @@ func IRTTPing() {
 			}
 		}()
 	}
+
+	notify()
 }
