@@ -203,14 +203,14 @@ func getGateway() string {
 		}
 		ipv6WanAddress := exporter.CollectIPv6WanAddress()
 		log.Info().Msgf("IPv6 WAN CIDR from Starlink router: %s", ipv6WanAddress)
-		_, net, err := net.ParseCIDR(ipv6WanAddress)
+		_, ipnet, err := net.ParseCIDR(ipv6WanAddress)
 		if err != nil {
 			log.Error().Err(err).Msg("Error parsing IPv6 WAN address CIDR")
 			return defaultIPv4CGNATGateway
 		}
 		IPVersion = 6
 		// technically, this is not the external IP, but we use it to get the PoP info
-		externalIP = net.IP.String()
+		externalIP = ipnet.IP.String()
 		// we still use the default CGNAT gateway for inactive dish
 		gatewayIP = defaultIPv4CGNATGateway
 		log.Info().Msgf("External IPv6 address from Starlink router: %s, gateway IP: %s", externalIP, gatewayIP)
