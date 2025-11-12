@@ -40,15 +40,10 @@ nfpms:
     dependencies:
     - bash
     - coreutils
-    - wget
-    - tree
     - iputils-ping
     - mtr
     - curl
     - traceroute
-    - sshpass
-    - rsync
-    - git
     - sudo
     - iproute2
     - dnsutils
@@ -66,3 +61,8 @@ nfpms:
       dst: /lib/systemd/system/lens.service
       file_info:
         mode: 0644
+
+dockers:
+  - image_templates:
+      - "docker.io/clarkzjw/lens"
+    skip_push: true
