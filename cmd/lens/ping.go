@@ -157,12 +157,12 @@ func IRTTPing() {
 	<-ctx.Done()
 
 	if EnableSwift {
-		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, ClientName)
+		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, SwiftTenant)
 		if err != nil {
 			log.Error().Err(err).Msg("Error creating Swift client")
 			return
 		}
-		localFilename := fullFilename + ".tar.zst"
+		localFilename := fullFilename
 
 		year := strconv.Itoa(time.Now().Year())
 		month := fmt.Sprintf("%02d", time.Now().Month())
