@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -86,6 +87,25 @@ func checkZstd() error {
 	return nil
 }
 
+func validResult(directory, filename string) error {
+	fullPath := path.Join(directory, filename)
+	data, err := os.ReadFile(fullPath)
+	if err != nil {
+		return fmt.Errorf("error reading %s: %w", fullPath, err)
+	}
+	content := string(data)
+
+	// Match variants like:
+	// [1763071200.038727] 64 bytes from 100.64.0.1: icmp_seq=1 ttl=63 time=33.1 ms
+	// 64 bytes from 100.64.0.1: icmp_seq=1 ttl=63 time=33.1 ms
+	re := regexp.MustCompile(`(?m)(?:\[\d+(?:\.\d+)?\]\s*)?\d+\s+bytes\s+from\s+[0-9a-fA-F:\.]+:.*\btime=[0-9.]+(?:\s*ms)?`)
+	if re.FindStringIndex(content) != nil {
+		return nil
+	}
+
+	return fmt.Errorf("%s contains no valid ping results", fullPath)
+}
+
 func compress(directory, filename string) error {
 	fullFilename := path.Join(directory, filename)
 	fileInfo, err := os.Stat(fullFilename)
@@ -94,6 +114,9 @@ func compress(directory, filename string) error {
 	}
 	if fileInfo.Size() == 0 {
 		return fmt.Errorf("%s is empty, skipping compression", fullFilename)
+	}
+	if err := validResult(directory, filename); err != nil {
+		return fmt.Errorf("no valid results in %s, skipping compression", fullFilename)
 	}
 
 	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
