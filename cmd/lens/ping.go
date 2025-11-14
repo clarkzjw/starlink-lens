@@ -87,7 +87,8 @@ func ICMPPing(target string, interval float64) {
 		}
 	}
 
-	if err := compress(path.Join(DataDir, today), filename); err != nil {
+	fullFilename, err = compress(path.Join(DataDir, today), filename)
+	if err != nil {
 		log.Error().Err(err).Msg("Error compressing ping output file")
 		return
 	}
@@ -98,7 +99,7 @@ func ICMPPing(target string, interval float64) {
 			log.Error().Err(err).Msg("Error creating Swift client")
 			return
 		}
-		localFilename := fullFilename + ".tar.zst"
+		localFilename := fullFilename
 
 		year := strconv.Itoa(time.Now().Year())
 		month := fmt.Sprintf("%02d", time.Now().Month())

@@ -106,28 +106,32 @@ func validResult(directory, filename string) error {
 	return fmt.Errorf("%s contains no valid ping results", fullPath)
 }
 
-func compress(directory, filename string) error {
+func compress(directory, filename string) (string, error) {
 	fullFilename := path.Join(directory, filename)
 	fileInfo, err := os.Stat(fullFilename)
 	if err != nil {
-		return fmt.Errorf("error stating file %s: %w", fullFilename, err)
+		return "", fmt.Errorf("error stating file %s: %w", fullFilename, err)
 	}
 	if fileInfo.Size() == 0 {
-		return fmt.Errorf("%s is empty, skipping compression", fullFilename)
+		return "", fmt.Errorf("%s is empty, skipping compression", fullFilename)
 	}
 	if err := validResult(directory, filename); err != nil {
-		return fmt.Errorf("no valid results in %s, skipping compression", fullFilename)
+		return "", fmt.Errorf("no valid results in %s, skipping compression", fullFilename)
 	}
 
-	cmd := exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
+	var cmd *exec.Cmd
 	if err := checkZstd(); err != nil {
 		cmd = exec.Command("tar", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.gz", filename)), filename, "--remove-files")
+		fullFilename = fmt.Sprintf("%s.tar.gz", fullFilename)
+	} else {
+		cmd = exec.Command("tar", "--zstd", "-C", directory, "-cf", path.Join(directory, fmt.Sprintf("%s.tar.zst", filename)), filename, "--remove-files")
+		fullFilename = fmt.Sprintf("%s.tar.zst", fullFilename)
 	}
 	log.Debug().Msgf("Compression command: %s", cmd.String())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	return fullFilename, cmd.Run()
 }
 
 func getExternalIP(version int) string {
