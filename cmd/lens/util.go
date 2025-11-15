@@ -201,19 +201,17 @@ func getStarlinkIPv6ActiveGateway() string {
 	cmd, err := exec.Command("mtr", "ipv6.google.com", "-n", "-m", IPv6GatewayHopCount, "-I", Iface, "-c", "1", "--json").CombinedOutput()
 	if err != nil {
 		log.Error().Err(err).Msgf("mtr failed: %s", string(cmd))
-		return ""
-	}
-
-	var mtrOutput MTRResult
-	err = json.Unmarshal([]byte(string(cmd)), &mtrOutput)
-	if err != nil {
-		log.Error().Err(err).Msg("Error unmarshalling mtr output")
-		return ""
-	}
-
-	for _, h := range mtrOutput.Report.Hubs {
-		if strconv.Itoa(int(h.Count)) == IPv6GatewayHopCount {
-			return h.Host
+	} else {
+		var mtrOutput MTRResult
+		err = json.Unmarshal([]byte(string(cmd)), &mtrOutput)
+		if err != nil {
+			log.Error().Err(err).Msg("Error unmarshalling mtr output")
+			return ""
+		}
+		for _, h := range mtrOutput.Report.Hubs {
+			if strconv.Itoa(int(h.Count)) == IPv6GatewayHopCount {
+				return h.Host
+			}
 		}
 	}
 
