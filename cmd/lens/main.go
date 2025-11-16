@@ -33,6 +33,7 @@ func init() {
 		if err := grpcClient.WriteObstructionMapImage(filename); err != nil {
 			log.Fatal().Err(err).Msg("Error writing obstruction map image")
 		}
+		return
 	}
 
 	geoipClient = NewGeoIPClient()
