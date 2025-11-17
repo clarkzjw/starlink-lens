@@ -175,7 +175,7 @@ def create_deb_packaging(
     package_component,
     release_version,
 ):
-    archs = ["amd64", "arm64"]
+    archs = ["amd64", "arm64", "armhf", "i386"]
 
     print(f"initialising configuration for {binary_name} , {archs}")
     Path(f"./{PROJECT_NAME}/conf").mkdir(parents=True, exist_ok=True)
@@ -195,6 +195,10 @@ def create_deb_packaging(
     for release in releases:
         for arch in archs:
             print(f"creating deb pkgs for {release} and {arch}...")
+            if arch == "i386":
+                arch = "386"
+            if arch == "armhf":
+                arch = "armv7"
             pkg_creator.create_deb_pkgs(
                 release,
                 f"./dist/{binary_name}_{release_version}_linux_{arch}.deb",
@@ -251,36 +255,6 @@ def parse_args():
         "--deb-based-releases",
         default=[
             "any",
-            # debian
-            # 13
-            "trixie",
-            # 12
-            "bookworm",
-            # 11
-            "bullseye",
-            # ubuntu
-            # 24.04
-            "noble",
-            # 22.04
-            "jammy",
-            # 20.04
-            "focal",
-            # 18.04
-            "bionic",
-            # 16.04
-            "xenial",
-            # 14.04
-            "trusty",
-            # 25.10
-            "questing",
-            # 25.04
-            "plucky",
-            # 24.10
-            "oracular",
-            # 23.10
-            "mantic",
-            # 23.04
-            "lunar",
         ],
         help="list of debian based releases that need to be packaged for",
     )
