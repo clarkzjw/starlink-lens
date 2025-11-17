@@ -37,6 +37,7 @@ var (
 
 	DishGrpcAddrPort   string
 	RouterGrpcAddrPort string
+	PingBinary         string
 
 	EnableSync = false
 	NotifyURL  string
@@ -77,7 +78,10 @@ func getConfigFromEnv() error {
 
 	EnableSync = os.Getenv("ENABLE_SYNC") == "true"
 	NotifyURL = os.Getenv("NOTIFY_URL")
-
+	PingBinary = os.Getenv("PING_BINARY")
+	if PingBinary == "" {
+		PingBinary = "ping"
+	}
 	EnableSwift = os.Getenv("ENABLE_SWIFT") == "true"
 	SwiftUsername = os.Getenv("SWIFT_USERNAME")
 	SwiftAPIKey = os.Getenv("SWIFT_APIKEY")
