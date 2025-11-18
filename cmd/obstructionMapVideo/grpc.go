@@ -18,16 +18,6 @@ import (
 	"github.com/pbnjay/pixfont"
 )
 
-var (
-	defaultDishAddress = "192.168.100.1:9200"
-	grpcTimeout        = 5 * time.Second
-	GRPCAddrPort       string
-	Duration           string
-	DataDir            string
-	FPS                int
-	CreateVideo        bool
-)
-
 type Exporter struct {
 	Conn   *grpc.ClientConn
 	Client device.DeviceClient
@@ -199,4 +189,18 @@ type StarlinkGetObstructionMapResponse struct {
 	Rows              int
 	Cols              int
 	Data              []byte
+}
+
+func (e *Exporter) ResetDishObstructionMap() error {
+	req := &device.Request{
+		Request: &device.Request_DishClearObstructionMap{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	_, err := e.Client.Handle(ctx, req)
+	if err != nil {
+		return fmt.Errorf("gRPC ClearObstructionMap failed: %s", err.Error())
+	}
+	return nil
 }

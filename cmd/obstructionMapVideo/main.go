@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+var (
+	defaultDishAddress = "192.168.100.1:9200"
+	grpcTimeout        = 5 * time.Second
+	GRPCAddrPort       string
+	Duration           string
+	DataDir            string
+	FPS                int
+	CreateVideo        bool
+	Reset              bool
+)
+
 func getTimeString() string {
 	return time.Now().UTC().Format("2006-01-02-15-04-05")
 }
@@ -39,6 +50,7 @@ func main() {
 	flag.StringVar(&DataDir, "data_dir", "./obstructionMapData", "Directory to save the obstruction map frames")
 	flag.IntVar(&FPS, "fps", 10, "Frames per second for the video")
 	flag.BoolVar(&CreateVideo, "video", true, "Create video from obstruction map frames")
+	flag.BoolVar(&Reset, "reset", false, "Reset the obstruction map every 15 seconds, at the 12nd, 27th, 42nd, and 57th second")
 	flag.Parse()
 
 	if CreateVideo {
@@ -76,6 +88,22 @@ func main() {
 		return
 	}
 
+	if Reset {
+		go func(grpcClient *Exporter) {
+			for {
+				now := time.Now()
+				sec := now.Second()
+				if sec == 12 || sec == 27 || sec == 42 || sec == 57 {
+					log.Printf("Resetting obstruction map at second: %d\n", sec)
+					if err := grpcClient.ResetDishObstructionMap(); err != nil {
+						log.Println("Error resetting obstruction map: ", err)
+					}
+				}
+				time.Sleep(time.Second)
+			}
+		}(grpcClient)
+	}
+
 	timeNow := time.Now()
 	timeEnd := timeNow.Add(durationSecond)
 
@@ -99,7 +127,7 @@ func main() {
 			log.Println("Error writing obstruction map: ", err)
 		}
 		f.Close()
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Millisecond * 500)
 	}
 
 	if CreateVideo {
