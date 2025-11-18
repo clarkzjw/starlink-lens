@@ -109,25 +109,7 @@ type StarlinkGetStatusResponse struct {
 	PhyRxBeamSnrAvg               float32
 }
 
-func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapResponse {
-	req := &device.Request{
-		Request: &device.Request_DishGetObstructionMap{},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-	resp, err := e.Client.Handle(ctx, req)
-	if err != nil {
-		fmt.Printf("gRPC GetObstructionMap failed: %s", err.Error())
-		return nil
-	}
-
-	dishObstructionMap := resp.GetDishGetObstructionMap()
-	rows := int(dishObstructionMap.NumRows)
-	cols := int(dishObstructionMap.NumCols)
-	referenceFrame := dishObstructionMap.GetMapReferenceFrame().String()
-	data := dishObstructionMap.Snr
-
+func createImageFromSNR(cols, rows int, data []float32) *image.RGBA {
 	upLeft := image.Point{0, 0}
 	lowRight := image.Point{cols * 2, rows * 2}
 
@@ -161,6 +143,29 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 			}
 		}
 	}
+	return img
+}
+
+func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapResponse {
+	req := &device.Request{
+		Request: &device.Request_DishGetObstructionMap{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	resp, err := e.Client.Handle(ctx, req)
+	if err != nil {
+		fmt.Printf("gRPC GetObstructionMap failed: %s", err.Error())
+		return nil
+	}
+
+	dishObstructionMap := resp.GetDishGetObstructionMap()
+	rows := int(dishObstructionMap.NumRows)
+	cols := int(dishObstructionMap.NumCols)
+	referenceFrame := dishObstructionMap.GetMapReferenceFrame().String()
+	data := dishObstructionMap.Snr
+
+	img := createImageFromSNR(cols, rows, data)
 
 	timestamp := time.Now().Format(time.RFC3339Nano)
 	parts := strings.Split(timestamp, "T")
@@ -178,7 +183,8 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 		MapReferenceFrame: referenceFrame,
 		Rows:              rows,
 		Cols:              cols,
-		Data:              buf.Bytes(),
+		InstImage:         buf.Bytes(),
+		Raw:               data,
 	}
 	return dishObstructionMapResp
 }
@@ -188,7 +194,10 @@ type StarlinkGetObstructionMapResponse struct {
 	MapReferenceFrame string
 	Rows              int
 	Cols              int
-	Data              []byte
+	InstImage         []byte
+	CumulativeImage   []byte
+	Raw               []float32
+	CumulativeRaw     []float32
 }
 
 func (e *Exporter) ResetDishObstructionMap() error {

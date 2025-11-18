@@ -122,7 +122,7 @@ func main() {
 			log.Println("Error creating obstruction map file: ", err)
 			return
 		}
-		_, err = f.Write(obstructionMap.Data)
+		_, err = f.Write(obstructionMap.InstImage)
 		if err != nil {
 			log.Println("Error writing obstruction map: ", err)
 		}
