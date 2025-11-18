@@ -38,10 +38,13 @@ func main() {
 	flag.StringVar(&Duration, "duration", "10s", "Duration for the obstruction map video")
 	flag.StringVar(&DataDir, "data_dir", "./obstructionMapData", "Directory to save the obstruction map frames")
 	flag.IntVar(&FPS, "fps", 10, "Frames per second for the video")
+	flag.BoolVar(&CreateVideo, "video", true, "Create video from obstruction map frames")
 	flag.Parse()
 
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		log.Fatal("ffmpeg is not installed. Please install ffmpeg to create videos.")
+	if CreateVideo {
+		if _, err := exec.LookPath("ffmpeg"); err != nil {
+			log.Fatal("ffmpeg is not installed. Please install ffmpeg to create videos.")
+		}
 	}
 
 	fmt.Printf("Using gRPC address: %s\n", GRPCAddrPort)
@@ -61,7 +64,7 @@ func main() {
 	DataDir = fmt.Sprintf("%s/%s", DataDir, startTime)
 
 	if _, err := os.Stat(DataDir); os.IsNotExist(err) {
-		err = os.MkdirAll(DataDir, 0640)
+		err = os.MkdirAll(DataDir, 0755)
 		if err != nil {
 			log.Fatalf("Error creating data directory: %s\n", err)
 		}
@@ -99,8 +102,10 @@ func main() {
 		time.Sleep(time.Second * 1)
 	}
 
-	if err := createVideo(DataDir, FPS); err != nil {
-		log.Println("Error creating video: ", err)
-		return
+	if CreateVideo {
+		if err := createVideo(DataDir, FPS); err != nil {
+			log.Println("Error creating video: ", err)
+			return
+		}
 	}
 }

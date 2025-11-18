@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ var (
 	Duration           string
 	DataDir            string
 	FPS                int
+	CreateVideo        bool
 )
 
 type Exporter struct {
@@ -170,8 +172,10 @@ func (e *Exporter) CollectDishObstructionMap() *StarlinkGetObstructionMapRespons
 		}
 	}
 
-	timestamp := time.Now().Format(time.RFC3339)
-	pixfont.DrawString(img, 10, 10, timestamp, color.RGBA{255, 255, 255, 255})
+	timestamp := time.Now().Format(time.RFC3339Nano)
+	parts := strings.Split(timestamp, "T")
+	pixfont.DrawString(img, 10, 10, parts[0], color.RGBA{255, 255, 255, 255})
+	pixfont.DrawString(img, 10, 20, parts[1], color.RGBA{255, 255, 255, 255})
 
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
