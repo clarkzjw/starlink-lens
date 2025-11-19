@@ -14,6 +14,11 @@ import (
 )
 
 func ICMPPing(target string, interval float64) {
+	if PoP == "" {
+		log.Error().Msg("PoP is empty, skipping ICMP ping")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), sessionDuration)
 	defer cancel()
 
@@ -116,6 +121,11 @@ func ICMPPing(target string, interval float64) {
 }
 
 func IRTTPing() {
+	if PoP == "" {
+		log.Error().Msg("PoP is empty, skipping IRTT ping")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), sessionDuration+time.Minute*10)
 
 	today := checkDirectory()
@@ -127,7 +137,7 @@ func IRTTPing() {
 		defer cancel()
 
 		var local string
-		if IPVersion == 6 {
+		if IPVersion == 6 && len(externalIPv6) > 0 {
 			local = fmt.Sprintf("--local=[%s]", externalIPv6)
 		} else {
 			local = fmt.Sprintf("--local=%s", IRTTLocalIP)

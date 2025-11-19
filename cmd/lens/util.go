@@ -143,7 +143,12 @@ func getExternalIP(version int) string {
 		log.Error().Err(err).Msgf("get external IP%d addresses failed: %s", version, string(output))
 		return ""
 	}
-	return strings.Trim(string(output), "\n")
+	ip := strings.Trim(string(output), "\n")
+	if net.ParseIP(ip) == nil {
+		log.Error().Msgf("get external IP%d addresses failed: invalid IP %s", version, ip)
+		return ""
+	}
+	return ip
 }
 
 func getStarlinkPoP(ip string) string {
@@ -243,6 +248,7 @@ func getStarlinkIPv6ActiveGateway() string {
 func getGateway() string {
 	gatewayIP := ""
 	externalIP := ""
+	PoP = ""
 
 	if ManualSpecifiedGateway != "" {
 		if net.ParseIP(ManualSpecifiedGateway).To4() != nil {
@@ -326,8 +332,6 @@ func getGateway() string {
 
 	if externalIP != "" {
 		PoP = getStarlinkPoP(externalIP)
-	} else {
-		PoP = ""
 	}
 	StarlinkGateway = gatewayIP
 
