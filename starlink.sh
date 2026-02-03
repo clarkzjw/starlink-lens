@@ -61,9 +61,18 @@ install () {
     apt-get install speedtest -y
 }
 
+test_ipv6 () {
+    curl -6 -s https://one.one.one.one >/dev/null
+    return $?
+}
+
+IPV6_AVAILABLE=$(test_ipv6; echo $?)
+
 geoip () {
     curl -4 ipinfo.io
-    curl -6 v6.ipinfo.io
+    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
+        curl -6 v6.ipinfo.io
+    fi
 }
 
 cf_ray () {
@@ -80,7 +89,9 @@ dns () {
 trace () {
     OPTIONS="-r -w -i 1 -c 10 -b --mpls"
     mtr 1.1.1.1 $OPTIONS
-    mtr 2606:4700:4700::1111 $OPTIONS
+    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
+        mtr 2606:4700:4700::1111 $OPTIONS
+    fi
 }
 
 grpc_status () {
@@ -104,7 +115,6 @@ if [ "$INIT_FLAG" == "True" ]; then
 fi
 
 set -x
-
 networking
 grpc_status
 geoip
