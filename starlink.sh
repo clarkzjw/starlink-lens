@@ -61,6 +61,9 @@ install () {
     echo "Installing essential packages..."
     apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget
 
+    echo "Install additional tools..."
+    apt-get install -y chafa
+
     echo "Importing GPG key..."
     curl -fsSL https://pkg.jinwei.me/clarkzjw-pkg.key | tee /etc/apt/keyrings/clarkzjw-pkg.asc
 
@@ -136,6 +139,11 @@ networking () {
 obstruction_map () {
     lens -map
     ls -alh obstruction-map-*.png
+    filename=$(ls -alh obstruction-map-* -t | head -n 1 | awk '{print $9}')
+    echo "Obstruction map image saved to $filename"
+    if command -v chafa >/dev/null 2>&1; then
+        chafa "$filename" -f kitty -s 25x25
+    fi
 }
 
 ping_gw () {
