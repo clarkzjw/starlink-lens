@@ -1,14 +1,36 @@
 #!/usr/bin/env bash
 
+help () {
+    echo "Usage: sudo $0 [--install | <interface>]"
+    echo "  --install       Install required packages and tools"
+    echo "  <interface>     Specify the Starlink network interface to use for tests"
+    echo -e "\ne.g.: "
+    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash --install"
+    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash eth0"
+    exit 1
+}
+
 INIT_FLAG=False
+IFACE=""
 if [ "$1" == "--install" ]; then
   INIT_FLAG=True
+elif [ -n "$1" ]; then
+    IFACE="$1"
+    if ! ip link show "$IFACE" >/dev/null 2>&1; then
+        echo "Interface $IFACE does not exist."
+        exit 1
+    fi
+fi
+echo $IFACE
+if [ -z "$IFACE" ]; then
+    echo "No Starlink interface specified."
+    help
 fi
 
 USER_ID=$(id -u)
 if [ "$USER_ID" -ne 0 ]; then
   echo "This script must be run as root. Please use sudo."
-  exit 1
+  help
 fi
 
 install () {
@@ -69,9 +91,9 @@ test_ipv6 () {
 IPV6_AVAILABLE=$(test_ipv6; echo $?)
 
 geoip () {
-    curl -4 ipinfo.io
+    curl -4 ipinfo.io --interface "$IFACE"
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
-        curl -6 v6.ipinfo.io
+        curl -6 v6.ipinfo.io --interface "$IFACE"
     fi
 }
 
@@ -80,6 +102,7 @@ cf_ray () {
 }
 
 dns () {
+    # TODO: support -b option to bind to specific interface
     OPTIONS="CHAOS TXT id.server +nsid"
     dig @1.1.1.1 $OPTIONS
     dig @8.8.8.8 $OPTIONS
@@ -88,6 +111,9 @@ dns () {
 
 trace () {
     OPTIONS="-r -w -i 1 -c 10 -b --mpls"
+    if [ -n "$IFACE" ]; then
+        OPTIONS="$OPTIONS -i $IFACE"
+    fi
     mtr 1.1.1.1 $OPTIONS
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
         mtr 2606:4700:4700::1111 $OPTIONS
@@ -106,7 +132,13 @@ networking () {
 
 obstruction_map () {
     lens -map
-    ls -alh
+    ls -alh obstruction-map-*.png
+}
+
+ping () {
+    datetime=$(date "+%y%m%d-%H%M%S")
+    ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
+    ls -alh ping-100.64.0.1-*.txt
 }
 
 if [ "$INIT_FLAG" == "True" ]; then
@@ -122,3 +154,4 @@ cf_ray
 dns
 trace
 obstruction_map
+ping
