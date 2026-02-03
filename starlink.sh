@@ -4,9 +4,13 @@ help () {
     echo "Usage: sudo $0 [--install | <interface>]"
     echo "  --install       Install required packages and tools"
     echo "  <interface>     Specify the Starlink network interface to use for tests"
-    echo -e "\ne.g.: "
+    echo -e "\ne.g.:"
     echo "  curl -fsSL https://starlink.jinwei.me | sudo bash --install"
-    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash eth0"
+    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash -s -- eth0"
+    echo -e "\nOr run the script after downloading"
+    echo "  wget -O starlink.sh https://starlink.jinwei.me"
+    echo "  sudo bash starlink.sh --install"
+    echo "  sudo bash starlink.sh eth0"
     exit 1
 }
 
@@ -21,7 +25,6 @@ elif [ -n "$1" ]; then
         exit 1
     fi
 fi
-echo $IFACE
 if [ -z "$IFACE" ]; then
     echo "No Starlink interface specified."
     help
@@ -112,7 +115,7 @@ dns () {
 trace () {
     OPTIONS="-r -w -i 1 -c 10 -b --mpls"
     if [ -n "$IFACE" ]; then
-        OPTIONS="$OPTIONS -i $IFACE"
+        OPTIONS="$OPTIONS -I $IFACE"
     fi
     mtr 1.1.1.1 $OPTIONS
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
@@ -135,7 +138,7 @@ obstruction_map () {
     ls -alh obstruction-map-*.png
 }
 
-ping () {
+ping_gw () {
     datetime=$(date "+%y%m%d-%H%M%S")
     ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
     ls -alh ping-100.64.0.1-*.txt
@@ -154,4 +157,4 @@ cf_ray
 dns
 trace
 obstruction_map
-ping
+ping_gw
