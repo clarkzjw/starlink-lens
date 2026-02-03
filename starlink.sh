@@ -55,6 +55,10 @@ install () {
     wget -O /tmp/grpcurl.deb "$GRPCURL_PKG_URL"
     dpkg -i /tmp/grpcurl.deb && rm -f /tmp/grpcurl.deb
     grpcurl --version
+
+    echo "Installing speedtest-cli..."
+    curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
+    apt-get install speedtest -y
 }
 
 geoip () {
