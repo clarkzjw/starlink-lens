@@ -40,8 +40,12 @@ install () {
     curl -fsSL https://pkg.jinwei.me/clarkzjw-pkg.key | tee /etc/apt/keyrings/clarkzjw-pkg.asc
 
     echo "Adding Lens repository..."
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/clarkzjw-pkg.asc] https://pkg.jinwei.me/lens any main" | sudo tee /etc/apt/sources.list.d/starlink-lens.list
-    apt-get update && apt-get install lens -y
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/clarkzjw-pkg.asc] https://pkg.jinwei.me/lens any main" | tee /etc/apt/sources.list.d/starlink-lens.list
+
+    echo "Adding Starlink-Telegraf repository..."
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/clarkzjw-pkg.asc] https://pkg.jinwei.me/starlink-telegraf any main" | tee /etc/apt/sources.list.d/starlink-telegraf.list
+
+    apt-get update && apt-get install lens starlink-telegraf -y
 
     GRPCURL_VERSION=$(curl -s "https://api.github.com/repos/fullstorydev/grpcurl/tags" | jq -r '.[0].name')
     GRPCURL_VERSION="${GRPCURL_VERSION#v}"
@@ -54,19 +58,15 @@ install () {
 }
 
 geoip () {
-    set -x
     curl -4 ipinfo.io
     curl -6 v6.ipinfo.io
-    set +x
 }
 
 cf_ray () {
-    echo "Cloudflare edge server:"
     curl -sI https://www.cloudflare.com/cdn-cgi/trace | grep cf-ray
 }
 
 dns () {
-    echo "DNS resolvers:"
     OPTIONS="CHAOS TXT id.server +nsid"
     dig @1.1.1.1 $OPTIONS
     dig @8.8.8.8 $OPTIONS
@@ -91,11 +91,15 @@ networking () {
 
 obstruction_map () {
     lens -map
+    ls -alh
 }
 
 if [ "$INIT_FLAG" == "True" ]; then
     install
+    exit 0
 fi
+
+set -x
 
 networking
 grpc_status
