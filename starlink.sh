@@ -11,6 +11,7 @@ help () {
     echo "  wget -O starlink.sh https://starlink.jinwei.me"
     echo "  sudo bash starlink.sh --install"
     echo "  sudo bash starlink.sh eth0"
+    echo -e "\nNote: Image display with chafa works in modern terminal emulators like iTerm2, Ghostty, etc."
     exit 1
 }
 
@@ -62,7 +63,7 @@ install () {
     apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget
 
     echo "Install additional tools..."
-    apt-get install -y chafa
+    apt-get install -y chafa gnuplot gawk
 
     echo "Importing GPG key..."
     curl -fsSL https://pkg.jinwei.me/clarkzjw-pkg.key | tee /etc/apt/keyrings/clarkzjw-pkg.asc
@@ -150,6 +151,13 @@ ping_gw () {
     datetime=$(date "+%y%m%d-%H%M%S")
     ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
     ls -alh ping-100.64.0.1-*.txt
+
+    filename=$(ls -alh ping-100.64.0.1-*.txt -t | head -n 1 | awk '{print $9}')
+    echo "Ping 100.64.0.1 result saved to $filename"
+
+    gawk 'BEGIN {prev_id=-1; nroll=0} $3=="bytes" {id=substr($6,10); if (prev_id-id>10000){nroll+=1}; seqid=65536*nroll+id; prev_id=id; print seqid,substr($8,6)}' "$filename" | gnuplot -e "set terminal png size 3000,500; set output '$filename.png'; unset label; unset key; plot '-'"
+
+    chafa "$filename.png" -f kitty
 }
 
 if [ "$INIT_FLAG" == "True" ]; then
