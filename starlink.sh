@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+## TODO:
+# - Add support for other distros on Linux
+# - Add support for macOS (brew install ...)
+# - Add Netflix OCA list check
+# - Add Starlink speed test
+# - Upload test result to S3 servers
+
 help () {
     echo "Usage: sudo $0 [--install | <interface>]"
     echo "  --install       Install required packages and tools"
@@ -102,6 +109,11 @@ test () {
 test_ipv6 () {
     curl -6 -s https://one.one.one.one >/dev/null
     return $?
+}
+
+get_uuid () {
+    uuid=$(python3 -c "import uuid; print(str(uuid.uuid5(uuid.NAMESPACE_DNS, str(uuid.getnode()))))")
+    echo "$uuid"
 }
 
 INIT_FLAG=False
@@ -317,3 +329,5 @@ if [ "$INIT_FLAG" == "True" ]; then
 fi
 
 run_once
+# uuid=$(get_uuid)
+# echo $uuid
