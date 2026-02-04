@@ -8,17 +8,20 @@
 # - Upload test result to Cloudflare R2 buckets via Worker proxy
 
 help () {
-    echo "Usage: sudo $0 [--install | <interface>]"
+    echo -e "Usage:\n       sudo bash $0 [--install | <interface>]"
+    echo -e "\nArguments:"
     echo "  --install       Install required packages and tools"
-    echo "  <interface>     Specify the Starlink network interface to use for tests"
-    echo -e "\ne.g.:"
+    echo "  <interface>     Specify the Starlink interface to use for measurements"
+    echo -e "\nExamples:"
+    echo -e "  # One-liner Execution"
     echo "  curl -fsSL https://starlink.jinwei.me | sudo bash -s -- --install"
     echo "  curl -fsSL https://starlink.jinwei.me | sudo bash -s -- eth0"
-    echo -e "\nOr run the script after downloading"
+    echo -e "\n  # Local Execution"
     echo "  wget -O starlink.sh https://starlink.jinwei.me"
     echo "  sudo bash starlink.sh --install"
     echo "  sudo bash starlink.sh eth0"
-    echo -e "\nNote: Image display with chafa works in modern terminal emulators like iTerm2, Ghostty, WezTerm, etc."
+    echo -e "\nNote:\n  Rich image rendering in terminal requires a modern terminal emulator. (e.g., iTerm2, Ghostty, WezTerm, Kitty, etc.)"
+    echo -e "\nContact: clarkzjw@uvic.ca"
     exit 1
 }
 
@@ -307,7 +310,8 @@ ping_gw () {
 
 run_once() {
     if [ -z "$IFACE" ]; then
-        echo -e "No Starlink interface specified.\n"
+        echo -e "Error: No interface name specified. \n       Please provide the interface name that is connected to Starlink."
+        echo -e "\nAvailable interfaces: \n       $(ls /sys/class/net | grep -Ev "lo|br|docker0|veth|tailscale0" | xargs)\n"
         help
     fi
 
