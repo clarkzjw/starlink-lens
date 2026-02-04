@@ -7,7 +7,7 @@
 # - Add Starlink speed test
 # - Upload test result to Cloudflare R2 buckets via Worker proxy
 
-VERSION="20260204.1"
+VERSION="20260204.5"
 
 help () {
     echo -e "Usage:\n       sudo bash $0 [--install | <interface>]"
@@ -130,6 +130,7 @@ get_datetime () {
 }
 
 DATA_DIR=""
+datetime=$(get_datetime)
 
 INIT_FLAG=False
 IFACE=""
@@ -265,8 +266,23 @@ dns () {
     cat "$DATA_DIR/dig.txt"
 }
 
-trace () {
-    echo -e "###### MTR to Cloudflare"
+traceroute_trace () {
+    echo -e "###### Traceroute to Cloudflare"
+
+    OPTIONS="-I"
+    if [ -n "$IFACE" ]; then
+        OPTIONS="$OPTIONS -i $IFACE"
+    fi
+    traceroute 1.1.1.1 $OPTIONS > "$DATA_DIR/traceroute.txt"
+    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
+        traceroute 2606:4700:4700::1111 $OPTIONS >> "$DATA_DIR/traceroute.txt"
+    fi
+
+    cat "$DATA_DIR/traceroute.txt"
+}
+
+mtr_trace () {
+    echo -e "\n###### MTR to Cloudflare"
 
     OPTIONS="-r -w -i 1 -c 10 -b --mpls"
     if [ -n "$IFACE" ]; then
@@ -312,7 +328,6 @@ obstruction_map () {
 ping_gw () {
     echo -e "\n###### Ping Starlink Gateway"
 
-    datetime=$(date "+%y%m%d-%H%M%S")
     ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
     ls -alh ping-100.64.0.1-*.txt
 
@@ -333,7 +348,6 @@ ping_gw () {
 }
 
 setup_directory () {
-    datetime=$(get_datetime)
     DATA_DIR="data/$datetime"
     mkdir -p "$DATA_DIR"
 }
@@ -358,7 +372,8 @@ run_once() {
     geoip
     cf_ray
     dns
-    trace
+    traceroute_trace
+    mtr_trace
     obstruction_map
     ping_gw
 }
