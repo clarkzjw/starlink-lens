@@ -7,6 +7,8 @@
 # - Add Starlink speed test
 # - Upload test result to Cloudflare R2 buckets via Worker proxy
 
+VERSION="20260204.1"
+
 help () {
     echo -e "Usage:\n       sudo bash $0 [--install | <interface>]"
     echo -e "\nArguments:"
@@ -22,8 +24,11 @@ help () {
     echo "  sudo bash starlink.sh eth0"
     echo -e "\nNote:\n  Rich image rendering in terminal requires a modern terminal emulator. (e.g., iTerm2, Ghostty, WezTerm, Kitty, etc.)"
     echo -e "\nContact: clarkzjw@uvic.ca"
+    echo -e "Version: $VERSION"
     exit 1
 }
+
+STARLINK_GRPC_ENDPOINT="192.168.100.1:9200"
 
 #######################################################
 # Detect terminal emulator type and its image protocol support
@@ -119,6 +124,13 @@ get_uuid () {
     echo "$uuid"
 }
 
+get_datetime () {
+    datetime=$(date -u "+%Y%m%d-%H%M%S")
+    echo "$datetime"
+}
+
+DATA_DIR=""
+
 INIT_FLAG=False
 IFACE=""
 if [ "$1" == "--install" ]; then
@@ -160,7 +172,7 @@ install () {
     apt-get update
 
     echo "Installing essential packages..."
-    apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget python3
+    apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget python3 jq
 
     echo "Install additional tools..."
     apt-get install -y chafa gnuplot gawk
@@ -197,11 +209,11 @@ test_subnet () {
     cidr=$(python3 -c "import ipaddress, sys; ip = ipaddress.ip_address('$IP'); matches = [l.strip() for l in open('$CIDR_FILE') if l.strip() and ip in ipaddress.ip_network(l.strip(), strict=False)]; print(*matches, sep='\n') if matches else sys.exit(1)")
 
     if [ $? -eq 0 ]; then
-        echo "Match $cidr"
-        grep "$cidr" feed.csv || echo "No matching subnet $cidr in feed.csv"
-        grep "$cidr" pops.csv || echo "No matching subnet $cidr in pops.csv"
+        echo -e "\nMatch $cidr" >> "$DATA_DIR/geoip.txt"
+        grep "$cidr" feed.csv >> "$DATA_DIR/geoip.txt"  || echo -e "\nNo matching subnet $cidr in feed.csv" >> "$DATA_DIR/geoip.txt"
+        grep "$cidr" pops.csv >> "$DATA_DIR/geoip.txt" || echo -e "\nNo matching subnet $cidr in pops.csv" >> "$DATA_DIR/geoip.txt"
     else
-        echo "No Match"
+        echo -e "\nNo Match"
     fi
 }
 
@@ -213,39 +225,44 @@ geoip () {
 
     cat feed.csv | awk -F',' '{print $1}' > subnet.txt
 
-    echo -e "\n###### GeoIP Lookup via ipinfo.io"
-    curl -4 ipinfo.io --interface "$IFACE"
+    echo -e "\n\n###### Checking GeoIP and PoP information"
+    curl -4 -s ipinfo.io --interface "$IFACE" > "$DATA_DIR/geoip.txt"
     v4_ip=$(curl -4 -s ipinfo.io/ip --interface "$IFACE")
 
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
-        curl -6 v6.ipinfo.io --interface "$IFACE"
+        curl -6 -s v6.ipinfo.io --interface "$IFACE" >> "$DATA_DIR/geoip.txt"
         v6_ip=$(curl -6 -s v6.ipinfo.io/ip --interface "$IFACE")
     fi
 
-    echo -e "\n\n###### Checking GeoIP and PoP information"
-    test_subnet "$v4_ip" "subnet.txt"
+    test_subnet "$v4_ip" "subnet.txt" >> "$DATA_DIR/geoip.txt"
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
-        test_subnet "$v6_ip" "subnet.txt"
+        test_subnet "$v6_ip" "subnet.txt" >> "$DATA_DIR/geoip.txt"
     fi
 
+    cat "$DATA_DIR/geoip.txt"
+    mv pops.csv "$DATA_DIR/pops.csv"
+    mv feed.csv "$DATA_DIR/feed.csv"
     rm -f subnet.txt
 }
 
 cf_ray () {
     echo -e "\n###### Cloudflare Ray ID"
-    curl -sI https://www.cloudflare.com/cdn-cgi/trace | grep cf-ray
+    curl -sI https://www.cloudflare.com/cdn-cgi/trace | grep cf-ray > "$DATA_DIR/cf-ray.txt"
+    cat "$DATA_DIR/cf-ray.txt"
 }
 
 dns () {
     # TODO: support -b option to bind to specific interface
     echo -e "\n###### Checking DNS resolver locations"
     OPTIONS="CHAOS TXT id.server +nsid"
-    echo -e "-- Cloudflare DNS"
-    dig @1.1.1.1 $OPTIONS
-    echo -e "-- Google DNS"
-    dig @8.8.8.8 $OPTIONS
-    echo -e "-- Quad9 DNS"
-    dig @9.9.9.9 $OPTIONS
+    echo -e "-- Cloudflare DNS" > "$DATA_DIR/dig.txt"
+    dig @1.1.1.1 $OPTIONS >> "$DATA_DIR/dig.txt"
+    echo -e "-- Google DNS" >> "$DATA_DIR/dig.txt"
+    dig @8.8.8.8 $OPTIONS >> "$DATA_DIR/dig.txt"
+    echo -e "-- Quad9 DNS" >> "$DATA_DIR/dig.txt"
+    dig @9.9.9.9 $OPTIONS >> "$DATA_DIR/dig.txt"
+
+    cat "$DATA_DIR/dig.txt"
 }
 
 trace () {
@@ -255,18 +272,22 @@ trace () {
     if [ -n "$IFACE" ]; then
         OPTIONS="$OPTIONS -I $IFACE"
     fi
-    mtr 1.1.1.1 $OPTIONS
+    mtr 1.1.1.1 $OPTIONS > "$DATA_DIR/mtr.txt"
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
-        mtr 2606:4700:4700::1111 $OPTIONS
+        mtr 2606:4700:4700::1111 $OPTIONS >> "$DATA_DIR/mtr.txt"
     fi
+
+    cat "$DATA_DIR/mtr.txt"
 }
 
 grpc_status () {
     echo -e "\n###### Starlink GRPC Status"
-    grpcurl -plaintext -d {\"get_status\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle
+    grpcurl -plaintext -d {\"get_status\":{}} $STARLINK_GRPC_ENDPOINT SpaceX.API.Device.Device/Handle > "$DATA_DIR/grpc_status.json"
+    cat "$DATA_DIR/grpc_status.json" | jq '.'
 
     echo -e "\n###### Starlink GRPC Location"
-    grpcurl -plaintext -d {\"get_location\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle
+    grpcurl -plaintext -d {\"get_location\":{}} $STARLINK_GRPC_ENDPOINT SpaceX.API.Device.Device/Handle > "$DATA_DIR/grpc_location.json"
+    cat "$DATA_DIR/grpc_location.json" | jq '.'
 }
 
 show_networking () {
@@ -281,9 +302,10 @@ obstruction_map () {
     lens -map
     ls -alh obstruction-map-*.png
     filename=$(ls -alh obstruction-map-* -t | head -n 1 | awk '{print $9}')
-    echo "Obstruction map image saved to $filename"
+    mv "$filename" "$DATA_DIR/$filename"
+    echo "Obstruction map image saved to $DATA_DIR/$filename"
     if test chafa; then
-        chafa "$filename" -f $PROTOCOLS -s 25x25
+        chafa "$DATA_DIR/$filename" -f $PROTOCOLS -s 25x25
     fi
 }
 
@@ -300,12 +322,26 @@ ping_gw () {
     if test gawk && test gnuplot; then
         echo "Generating ping latency plot..."
         gawk 'BEGIN {prev_id=-1; nroll=0} $3=="bytes" {id=substr($6,10); if (prev_id-id>10000){nroll+=1}; seqid=65536*nroll+id; prev_id=id; print seqid,substr($8,6)}' "$filename" | gnuplot -e "set terminal png size 3000,500; set output '$filename.png'; unset label; unset key; plot '-'"
+        mv "$filename.png" "$DATA_DIR/$filename.png"
+        mv "$filename" "$DATA_DIR/$filename"
 
-        chafa "$filename.png" -f $PROTOCOLS
+        chafa "$DATA_DIR/$filename.png" -f $PROTOCOLS
     else
         echo "gawk or gnuplot not found, skipping latency plot generation."
         return
     fi
+}
+
+setup_directory () {
+    datetime=$(get_datetime)
+    DATA_DIR="data/$datetime"
+    mkdir -p "$DATA_DIR"
+}
+
+cleanup () {
+    tar -czvf "data/$datetime.tar.gz" "$DATA_DIR"
+    rm -rf "$DATA_DIR"
+    echo "All data saved to data/$datetime.tar.gz"
 }
 
 run_once() {
@@ -332,6 +368,6 @@ if [ "$INIT_FLAG" == "True" ]; then
     exit 0
 fi
 
+setup_directory
 run_once
-# uuid=$(get_uuid)
-# echo $uuid
+cleanup
