@@ -5,7 +5,7 @@
 # - Add support for macOS (brew install ...)
 # - Add Netflix OCA list check
 # - Add Starlink speed test
-# - Upload test result to S3 servers
+# - Upload test result to Cloudflare R2 buckets via Worker proxy
 
 help () {
     echo "Usage: sudo $0 [--install | <interface>]"
