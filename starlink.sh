@@ -66,7 +66,7 @@ install () {
     apt-get update
 
     echo "Installing essential packages..."
-    apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget
+    apt-get install -y curl gnupg2 ca-certificates lsb-release traceroute mtr iputils-ping screen jq bind9-dnsutils wget python3
 
     echo "Install additional tools..."
     apt-get install -y chafa gnuplot gawk
@@ -87,7 +87,7 @@ install () {
     echo "Latest grpcurl version: $GRPCURL_VERSION"
     GRPCURL_PKG_URL=https://github.com/fullstorydev/grpcurl/releases/download/v"$GRPCURL_VERSION"/grpcurl_"$GRPCURL_VERSION"_linux_"$ARCH".deb
     echo "Downloading grpcurl from $GRPCURL_PKG_URL..."
-    wget -O /tmp/grpcurl.deb "$GRPCURL_PKG_URL"
+    wget --quiet -O /tmp/grpcurl.deb "$GRPCURL_PKG_URL"
     dpkg -i /tmp/grpcurl.deb && rm -f /tmp/grpcurl.deb
     grpcurl --version
 
@@ -96,26 +96,67 @@ install () {
     apt-get install speedtest -y
 }
 
-geoip () {
-    curl -4 ipinfo.io --interface "$IFACE"
-    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
-        curl -6 v6.ipinfo.io --interface "$IFACE"
+test_subnet () {
+    IP="$1"
+    CIDR_FILE="$2"
+
+    cidr=$(python3 -c "import ipaddress, sys; ip = ipaddress.ip_address('$IP'); matches = [l.strip() for l in open('$CIDR_FILE') if l.strip() and ip in ipaddress.ip_network(l.strip(), strict=False)]; print(*matches, sep='\n') if matches else sys.exit(1)")
+
+    if [ $? -eq 0 ]; then
+        echo "Match $cidr"
+        grep "$cidr" feed.csv || echo "No matching subnet $cidr in feed.csv"
+        grep "$cidr" pops.csv || echo "No matching subnet $cidr in pops.csv"
+    else
+        echo "No Match"
     fi
 }
 
+geoip () {
+    echo -e "\n###### Downloading feed.csv and pops.csv from geoip.starlinkisp.net..."
+
+    wget --quiet -O feed.csv https://geoip.starlinkisp.net/feed.csv
+    wget --quiet -O pops.csv https://geoip.starlinkisp.net/pops.csv
+
+    cat feed.csv | awk -F',' '{print $1}' > subnet.txt
+
+    echo -e "\n###### GeoIP Lookup via ipinfo.io"
+    curl -4 ipinfo.io --interface "$IFACE"
+    v4_ip=$(curl -4 -s ipinfo.io/ip --interface "$IFACE")
+
+    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
+        curl -6 v6.ipinfo.io --interface "$IFACE"
+        v6_ip=$(curl -6 -s v6.ipinfo.io/ip --interface "$IFACE")
+    fi
+
+    echo -e "\n###### Checking GeoIP and PoP information"
+    test_subnet "$v4_ip" "subnet.txt"
+    if [ "$IPV6_AVAILABLE" -eq 0 ]; then
+        test_subnet "$v6_ip" "subnet.txt"
+    fi
+
+    rm -f subnet.txt
+}
+
 cf_ray () {
+    echo -e "\n###### Cloudflare Ray ID"
     curl -sI https://www.cloudflare.com/cdn-cgi/trace | grep cf-ray
 }
 
 dns () {
     # TODO: support -b option to bind to specific interface
+    echo -e "\n###### Checking DNS resolver locations"
     OPTIONS="CHAOS TXT id.server +nsid"
+    echo -e "-- Cloudflare DNS"
     dig @1.1.1.1 $OPTIONS
+    echo -e "-- Google DNS"
     dig @8.8.8.8 $OPTIONS
+    echo -e "-- Quad9 DNS"
     dig @9.9.9.9 $OPTIONS
 }
 
 trace () {
+    echo -e "\n###### MTR to Cloudflare"
+
     OPTIONS="-r -w -i 1 -c 10 -b --mpls"
     if [ -n "$IFACE" ]; then
         OPTIONS="$OPTIONS -I $IFACE"
@@ -127,16 +168,22 @@ trace () {
 }
 
 grpc_status () {
+    echo -e "\n###### Starlink GRPC Status"
     grpcurl -plaintext -d {\"get_status\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle
+
+    echo -e "\n###### Starlink GRPC Location"
     grpcurl -plaintext -d {\"get_location\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle
 }
 
 show_networking () {
+    echo -e "###### Networking Interfaces"
     ip addr show
+    echo -e "###### Routing Table"
     ip route show
 }
 
 obstruction_map () {
+    echo -e "\n###### Generating Obstruction Map"
     lens -map
     ls -alh obstruction-map-*.png
     filename=$(ls -alh obstruction-map-* -t | head -n 1 | awk '{print $9}')
@@ -147,6 +194,8 @@ obstruction_map () {
 }
 
 ping_gw () {
+    echo -e "\n###### Ping Starlink Gateway"
+
     datetime=$(date "+%y%m%d-%H%M%S")
     ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
     ls -alh ping-100.64.0.1-*.txt
@@ -172,8 +221,6 @@ run_once() {
     fi
 
     IPV6_AVAILABLE=$(test_ipv6; echo $?)
-
-    set -x
 
     show_networking
     grpc_status
