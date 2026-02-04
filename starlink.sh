@@ -5,7 +5,7 @@ help () {
     echo "  --install       Install required packages and tools"
     echo "  <interface>     Specify the Starlink network interface to use for tests"
     echo -e "\ne.g.:"
-    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash --install"
+    echo "  curl -fsSL https://starlink.jinwei.me | sudo bash -s -- --install"
     echo "  curl -fsSL https://starlink.jinwei.me | sudo bash -s -- eth0"
     echo -e "\nOr run the script after downloading"
     echo "  wget -O starlink.sh https://starlink.jinwei.me"
