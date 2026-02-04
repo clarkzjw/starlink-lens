@@ -15,6 +15,16 @@ help () {
     exit 1
 }
 
+test () {
+    command -v "$1" >/dev/null 2>&1
+    return $?
+}
+
+test_ipv6 () {
+    curl -6 -s https://one.one.one.one >/dev/null
+    return $?
+}
+
 INIT_FLAG=False
 IFACE=""
 if [ "$1" == "--install" ]; then
@@ -25,10 +35,6 @@ elif [ -n "$1" ]; then
         echo "Interface $IFACE does not exist."
         exit 1
     fi
-fi
-if [ -z "$IFACE" ]; then
-    echo "No Starlink interface specified."
-    help
 fi
 
 USER_ID=$(id -u)
@@ -90,13 +96,6 @@ install () {
     apt-get install speedtest -y
 }
 
-test_ipv6 () {
-    curl -6 -s https://one.one.one.one >/dev/null
-    return $?
-}
-
-IPV6_AVAILABLE=$(test_ipv6; echo $?)
-
 geoip () {
     curl -4 ipinfo.io --interface "$IFACE"
     if [ "$IPV6_AVAILABLE" -eq 0 ]; then
@@ -132,7 +131,7 @@ grpc_status () {
     grpcurl -plaintext -d {\"get_location\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle
 }
 
-networking () {
+show_networking () {
     ip addr show
     ip route show
 }
@@ -142,7 +141,7 @@ obstruction_map () {
     ls -alh obstruction-map-*.png
     filename=$(ls -alh obstruction-map-* -t | head -n 1 | awk '{print $9}')
     echo "Obstruction map image saved to $filename"
-    if command -v chafa >/dev/null 2>&1; then
+    if test chafa; then
         chafa "$filename" -f kitty -s 25x25
     fi
 }
@@ -155,9 +154,35 @@ ping_gw () {
     filename=$(ls -alh ping-100.64.0.1-*.txt -t | head -n 1 | awk '{print $9}')
     echo "Ping 100.64.0.1 result saved to $filename"
 
-    gawk 'BEGIN {prev_id=-1; nroll=0} $3=="bytes" {id=substr($6,10); if (prev_id-id>10000){nroll+=1}; seqid=65536*nroll+id; prev_id=id; print seqid,substr($8,6)}' "$filename" | gnuplot -e "set terminal png size 3000,500; set output '$filename.png'; unset label; unset key; plot '-'"
+    if test gawk && test gnuplot; then
+        echo "Generating ping latency plot..."
+        gawk 'BEGIN {prev_id=-1; nroll=0} $3=="bytes" {id=substr($6,10); if (prev_id-id>10000){nroll+=1}; seqid=65536*nroll+id; prev_id=id; print seqid,substr($8,6)}' "$filename" | gnuplot -e "set terminal png size 3000,500; set output '$filename.png'; unset label; unset key; plot '-'"
 
-    chafa "$filename.png" -f kitty
+        chafa "$filename.png" -f kitty
+    else
+        echo "gawk or gnuplot not found, skipping latency plot generation."
+        return
+    fi
+}
+
+run_once() {
+    if [ -z "$IFACE" ]; then
+        echo -e "No Starlink interface specified.\n"
+        help
+    fi
+
+    IPV6_AVAILABLE=$(test_ipv6; echo $?)
+
+    set -x
+
+    show_networking
+    grpc_status
+    geoip
+    cf_ray
+    dns
+    trace
+    obstruction_map
+    ping_gw
 }
 
 if [ "$INIT_FLAG" == "True" ]; then
@@ -165,12 +190,4 @@ if [ "$INIT_FLAG" == "True" ]; then
     exit 0
 fi
 
-set -x
-networking
-grpc_status
-geoip
-cf_ray
-dns
-trace
-obstruction_map
-ping_gw
+run_once
