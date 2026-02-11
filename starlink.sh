@@ -29,6 +29,7 @@ help () {
 }
 
 STARLINK_GRPC_ENDPOINT="192.168.100.1:9200"
+STARLINK_GW="100.64.0.1"
 
 #######################################################
 # Detect terminal emulator type and its image protocol support
@@ -115,7 +116,7 @@ test () {
 }
 
 test_ipv6 () {
-    curl -6 -s https://one.one.one.one >/dev/null
+    curl -6 -s --connect-timeout 5 https://one.one.one.one >/dev/null
     return $?
 }
 
@@ -269,7 +270,7 @@ dns () {
 traceroute_trace () {
     echo -e "###### Traceroute to Cloudflare"
 
-    OPTIONS="-I"
+    OPTIONS="-I -e"
     if [ -n "$IFACE" ]; then
         OPTIONS="$OPTIONS -i $IFACE"
     fi
@@ -284,7 +285,7 @@ traceroute_trace () {
 mtr_trace () {
     echo -e "\n###### MTR to Cloudflare"
 
-    OPTIONS="-r -w -i 1 -c 10 -b --mpls"
+    OPTIONS="-r -w -i 1 -c 10 -b -G 1"
     if [ -n "$IFACE" ]; then
         OPTIONS="$OPTIONS -I $IFACE"
     fi
@@ -328,11 +329,11 @@ obstruction_map () {
 ping_gw () {
     echo -e "\n###### Ping Starlink Gateway"
 
-    ping -D -I "$IFACE" -c 10000 -i 0.01 100.64.0.1 > ping-100.64.0.1-$datetime.txt
-    ls -alh ping-100.64.0.1-*.txt
+    ping -D -I "$IFACE" -c 10000 -i 0.01 "$STARLINK_GW" > ping-$STARLINK_GW-$datetime.txt
+    ls -alh ping-$STARLINK_GW-*.txt
 
-    filename=$(ls -alh ping-100.64.0.1-*.txt -t | head -n 1 | awk '{print $9}')
-    echo "Ping 100.64.0.1 result saved to $filename"
+    filename=$(ls -alh ping-$STARLINK_GW-*.txt -t | head -n 1 | awk '{print $9}')
+    echo "Ping $STARLINK_GW result saved to $filename"
 
     if test gawk && test gnuplot; then
         echo "Generating ping latency plot..."
