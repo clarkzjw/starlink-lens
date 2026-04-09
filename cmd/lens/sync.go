@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	swift "github.com/ncw/swift/v2"
 	"github.com/phuslu/log"
@@ -59,10 +60,28 @@ func UploadToSwift(conn *swift.Connection, containerName, localPath, targetPath 
 		return fmt.Errorf("failed to calculate MD5 checksum for %s: %w", localPath, err)
 	}
 	log.Debug().Msgf("MD5 checksum of %s: %s", localPath, md5sum)
-	headers, err := conn.ObjectPut(context.Background(), containerName, targetPath, file, true, md5sum, "", nil)
-	if err != nil {
-		return fmt.Errorf("failed to upload file %s to Swift: %w", localPath, err)
+
+	retryCount := 3
+	var headers swift.Headers
+
+	for i := range retryCount {
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			return fmt.Errorf("failed to seek file %s: %w", localPath, err)
+		}
+
+		headers, err = conn.ObjectPut(context.Background(), containerName, targetPath, file, true, md5sum, "", nil)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second * 5)
+		log.Warn().Msgf("Failed to upload file %s to Swift (attempt %d/%d): %v", localPath, i+1, retryCount, err)
 	}
+
+	if err != nil {
+		return fmt.Errorf("failed to upload file %s to Swift after %d retries: %w", localPath, retryCount, err)
+	}
+
 	log.Debug().Msgf("Successfully uploaded %s to container %s as %s\nHeaders: %v\n", localPath, containerName, targetPath, headers)
 	return nil
 }
