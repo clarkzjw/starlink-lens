@@ -121,7 +121,9 @@ func (h *stdSlogHandler) header(now time.Time) *Entry {
 	}
 	// time
 	if h.logger.TimeField == "" {
-		e.buf = append(e.buf, "{\"time\":"...)
+		e.buf = append(e.buf, "{\""...)
+		e.buf = append(e.buf, TimeKey...)
+		e.buf = append(e.buf, "\":"...)
 	} else {
 		e.buf = append(e.buf, '{', '"')
 		e.buf = append(e.buf, h.logger.TimeField...)
@@ -304,16 +306,32 @@ func (h *stdSlogHandler) Handle(_ context.Context, r slog.Record) error {
 	switch r.Level {
 	case slog.LevelDebug:
 		e.Level = DebugLevel
-		e.buf = append(e.buf, ",\"level\":\"debug\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, DebugLevelString...)
+		e.buf = append(e.buf, '"')
 	case slog.LevelInfo:
 		e.Level = InfoLevel
-		e.buf = append(e.buf, ",\"level\":\"info\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, InfoLevelString...)
+		e.buf = append(e.buf, '"')
 	case slog.LevelWarn:
 		e.Level = WarnLevel
-		e.buf = append(e.buf, ",\"level\":\"warn\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, WarnLevelString...)
+		e.buf = append(e.buf, '"')
 	case slog.LevelError:
 		e.Level = ErrorLevel
-		e.buf = append(e.buf, ",\"level\":\"error\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, ErrorLevelString...)
+		e.buf = append(e.buf, '"')
 	default:
 		e.Level = noLevel
 	}
@@ -328,7 +346,7 @@ func (h *stdSlogHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	// msg
-	e = e.Str("message", r.Message)
+	e = e.Str(MessageKey, r.Message)
 
 	// with
 	if b := h.entry.buf; len(b) != 0 {

@@ -472,7 +472,9 @@ func (l *Logger) header(level Level) *Entry {
 	}
 	// time
 	if l.TimeField == "" {
-		e.buf = append(e.buf, "{\"time\":"...)
+		e.buf = append(e.buf, "{\""...)
+		e.buf = append(e.buf, TimeKey...)
+		e.buf = append(e.buf, "\":"...)
 	} else {
 		e.buf = append(e.buf, '{', '"')
 		e.buf = append(e.buf, l.TimeField...)
@@ -666,19 +668,47 @@ headerlevel:
 	// level
 	switch level {
 	case DebugLevel:
-		e.buf = append(e.buf, ",\"level\":\"debug\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, DebugLevelString...)
+		e.buf = append(e.buf, '"')
 	case InfoLevel:
-		e.buf = append(e.buf, ",\"level\":\"info\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, InfoLevelString...)
+		e.buf = append(e.buf, '"')
 	case WarnLevel:
-		e.buf = append(e.buf, ",\"level\":\"warn\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, WarnLevelString...)
+		e.buf = append(e.buf, '"')
 	case ErrorLevel:
-		e.buf = append(e.buf, ",\"level\":\"error\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, ErrorLevelString...)
+		e.buf = append(e.buf, '"')
 	case TraceLevel:
-		e.buf = append(e.buf, ",\"level\":\"trace\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, TraceLevelString...)
+		e.buf = append(e.buf, '"')
 	case FatalLevel:
-		e.buf = append(e.buf, ",\"level\":\"fatal\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, FatalLevelString...)
+		e.buf = append(e.buf, '"')
 	case PanicLevel:
-		e.buf = append(e.buf, ",\"level\":\"panic\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, LevelKey...)
+		e.buf = append(e.buf, "\":\""...)
+		e.buf = append(e.buf, PanicLevelString...)
+		e.buf = append(e.buf, '"')
 	}
 	// context
 	if l.Context != nil {
@@ -1793,7 +1823,7 @@ func (e *Entry) NetIPPrefix(key string, pfx netip.Prefix) *Entry {
 
 // Type adds type of the key using reflection to the entry.
 func (e *Entry) Type(key string, v any) *Entry {
-	if e == nil {
+	if e == nil || (*[2]uintptr)(unsafe.Pointer(&v))[1] == 0 {
 		return nil
 	}
 
@@ -1827,7 +1857,9 @@ func (e *Entry) Stack() *Entry {
 		return nil
 	}
 
-	e.buf = append(e.buf, ",\"stack\":\""...)
+	e.buf = append(e.buf, ",\""...)
+	e.buf = append(e.buf, StackKey...)
+	e.buf = append(e.buf, "\":\""...)
 	e.bytes(stacks(false))
 	e.buf = append(e.buf, '"')
 	return e
@@ -1852,6 +1884,27 @@ func (e *Entry) Discard() *Entry {
 
 var notTest = true
 
+// TimeKey defines the field name for the time field.
+var TimeKey = "time"
+
+// MessageKey defines the field name for the message field.
+var MessageKey = "message"
+
+// LevelKey defines the field name for the level field.
+var LevelKey = "level"
+
+// CallerKey defines the field name for the caller field.
+var CallerKey = "caller"
+
+// CallerFuncKey defines the field name for the caller function field.
+var CallerFuncKey = "callerfunc"
+
+// GoidKey defines the field name for the goroutine id field.
+var GoidKey = "goid"
+
+// StackKey defines the field name for the stack field.
+var StackKey = "stack"
+
 // Msg sends the entry with msg added as the message field if not empty.
 func (e *Entry) Msg(msg string) {
 	if e == nil {
@@ -1859,7 +1912,9 @@ func (e *Entry) Msg(msg string) {
 	}
 
 	if msg != "" {
-		e.buf = append(e.buf, ",\"message\":\""...)
+		e.buf = append(e.buf, ",\""...)
+		e.buf = append(e.buf, MessageKey...)
+		e.buf = append(e.buf, "\":\""...)
 		e.string(msg)
 		e.buf = append(e.buf, "\"}\n"...)
 	} else {
@@ -1900,7 +1955,9 @@ func (e *Entry) Msgf(format string, v ...any) {
 
 	b := bbpool.Get().(*bb)
 	b.B = b.B[:0]
-	e.buf = append(e.buf, ",\"message\":\""...)
+	e.buf = append(e.buf, ",\""...)
+	e.buf = append(e.buf, MessageKey...)
+	e.buf = append(e.buf, "\":\""...)
 	fmt.Fprintf(b, format, v...)
 	e.bytes(b.B)
 	e.buf = append(e.buf, '"')
@@ -1918,7 +1975,9 @@ func (e *Entry) Msgs(args ...any) {
 
 	b := bbpool.Get().(*bb)
 	b.B = b.B[:0]
-	e.buf = append(e.buf, ",\"message\":\""...)
+	e.buf = append(e.buf, ",\""...)
+	e.buf = append(e.buf, MessageKey...)
+	e.buf = append(e.buf, "\":\""...)
 	fmt.Fprint(b, args...)
 	e.bytes(b.B)
 	e.buf = append(e.buf, '"')
@@ -1935,8 +1994,11 @@ func (e *Entry) caller(n int, pc uintptr, fullpath bool) {
 
 	file, line, name := pcFileLineName(pc)
 	if !fullpath {
-		var i, j int
-		for i = len(file) - 1; i >= 0; i-- {
+		var i, j, k int
+		if k = strings.IndexByte(file, '@'); k <= 0 {
+			k = len(file) - 1
+		}
+		for i = k; i >= 0; i-- {
 			if file[i] == '/' {
 				break
 			}
@@ -1957,13 +2019,19 @@ func (e *Entry) caller(n int, pc uintptr, fullpath bool) {
 		}
 	}
 
-	e.buf = append(e.buf, ",\"caller\":\""...)
+	e.buf = append(e.buf, ",\""...)
+	e.buf = append(e.buf, CallerKey...)
+	e.buf = append(e.buf, "\":\""...)
 	e.buf = append(e.buf, file...)
 	e.buf = append(e.buf, ':')
 	e.buf = strconv.AppendInt(e.buf, int64(line), 10)
-	e.buf = append(e.buf, "\",\"callerfunc\":\""...)
+	e.buf = append(e.buf, "\",\""...)
+	e.buf = append(e.buf, CallerFuncKey...)
+	e.buf = append(e.buf, "\":\""...)
 	e.buf = append(e.buf, name...)
-	e.buf = append(e.buf, "\",\"goid\":"...)
+	e.buf = append(e.buf, "\",\""...)
+	e.buf = append(e.buf, GoidKey...)
+	e.buf = append(e.buf, "\":"...)
 	e.buf = strconv.AppendInt(e.buf, int64(goid()), 10)
 }
 
@@ -2317,7 +2385,7 @@ func (e *Entry) Any(key string, value any) *Entry {
 		err := enc.Encode(value)
 		if err != nil {
 			b.B = b.B[:0]
-			fmt.Fprintf(b, `marshaling error: %+v`, err)
+			fmt.Fprintf(b, `%+v`, value)
 			e.buf = append(e.buf, '"')
 			e.bytes(b.B)
 			e.buf = append(e.buf, '"')
