@@ -114,7 +114,7 @@ Run the GUI from the repository root:
 go run ./cmd/obstructionMapGUI
 ```
 
-It starts polling immediately. Use the interval field to change the delay between pulls, Start/Stop to control polling, and the reset checkbox to clear the obstruction map at seconds 12, 27, 42, and 57 of every minute. A custom dish address can be supplied with `-addr_port`:
+It starts polling immediately and displays the current map beside the minimum-SNR map accumulated during the current Start session. Use the interval field to change the delay between pulls, Start/Stop to control polling, and the reset checkbox to clear the obstruction map at seconds 12, 27, 42, and 57 of every minute. Starting clears the accumulated figure; stopping preserves it. A custom dish address can be supplied with `-addr_port`:
 
 ```bash
 go run ./cmd/obstructionMapGUI -addr_port 192.168.100.1:9200

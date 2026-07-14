@@ -22,6 +22,12 @@ type grpcClient struct {
 	client device.DeviceClient
 }
 
+type obstructionMap struct {
+	cols int
+	rows int
+	snr  []float32
+}
+
 func newGRPCClient(ctx context.Context, address string) (*grpcClient, error) {
 	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -51,7 +57,7 @@ func (c *grpcClient) close() {
 	_ = c.conn.Close()
 }
 
-func (c *grpcClient) obstructionMap(ctx context.Context) (image.Image, error) {
+func (c *grpcClient) obstructionMap(ctx context.Context) (obstructionMap, error) {
 	ctx, cancel := context.WithTimeout(ctx, grpcTimeout)
 	defer cancel()
 
@@ -59,21 +65,21 @@ func (c *grpcClient) obstructionMap(ctx context.Context) (image.Image, error) {
 		Request: &device.Request_DishGetObstructionMap{},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("gRPC GetObstructionMap failed: %w", err)
+		return obstructionMap{}, fmt.Errorf("gRPC GetObstructionMap failed: %w", err)
 	}
 
-	obstructionMap := resp.GetDishGetObstructionMap()
-	if obstructionMap == nil {
-		return nil, errors.New("gRPC GetObstructionMap returned no map")
+	responseMap := resp.GetDishGetObstructionMap()
+	if responseMap == nil {
+		return obstructionMap{}, errors.New("gRPC GetObstructionMap returned no map")
 	}
-	rows := int(obstructionMap.GetNumRows())
-	cols := int(obstructionMap.GetNumCols())
-	data := obstructionMap.GetSnr()
+	rows := int(responseMap.GetNumRows())
+	cols := int(responseMap.GetNumCols())
+	data := responseMap.GetSnr()
 	if rows <= 0 || cols <= 0 || len(data) < rows*cols {
-		return nil, fmt.Errorf("invalid obstruction map dimensions: %dx%d with %d samples", cols, rows, len(data))
+		return obstructionMap{}, fmt.Errorf("invalid obstruction map dimensions: %dx%d with %d samples", cols, rows, len(data))
 	}
 
-	return createImageFromSNR(cols, rows, data), nil
+	return obstructionMap{cols: cols, rows: rows, snr: data}, nil
 }
 
 func (c *grpcClient) clearObstructionMap(ctx context.Context) error {

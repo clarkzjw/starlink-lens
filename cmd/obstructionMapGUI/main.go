@@ -28,10 +28,13 @@ type controller struct {
 	reset    bool
 	running  bool
 	cancel   context.CancelFunc
+	session  uint64
+	combined obstructionMap
 
-	button *widget.Button
-	status *widget.Label
-	image  *canvas.Image
+	button           *widget.Button
+	status           *widget.Label
+	currentImage     *canvas.Image
+	accumulatedImage *canvas.Image
 }
 
 func parseInterval(value string) (time.Duration, error) {
@@ -86,11 +89,15 @@ func (c *controller) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 	c.running = true
+	c.session++
+	session := c.session
+	c.combined = obstructionMap{}
 	c.mu.Unlock()
 
 	c.button.SetText("Stop")
+	c.clearAccumulatedImage()
 	c.setStatus("Connecting to " + c.address + "...")
-	go c.run(ctx)
+	go c.run(ctx, session)
 }
 
 func (c *controller) stop() {
@@ -119,10 +126,10 @@ func (c *controller) toggle() {
 	c.start()
 }
 
-func (c *controller) run(ctx context.Context) {
+func (c *controller) run(ctx context.Context, session uint64) {
 	client, err := newGRPCClient(ctx, c.address)
 	if err != nil {
-		c.runFailed(ctx, err)
+		c.runFailed(ctx, session, err)
 		return
 	}
 	defer client.close()
@@ -132,7 +139,7 @@ func (c *controller) run(ctx context.Context) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		c.poll(ctx, client)
+		c.poll(ctx, session, client)
 	}()
 	go func() {
 		defer wg.Done()
@@ -141,16 +148,23 @@ func (c *controller) run(ctx context.Context) {
 	wg.Wait()
 }
 
-func (c *controller) poll(ctx context.Context, client *grpcClient) {
+func (c *controller) poll(ctx context.Context, session uint64, client *grpcClient) {
 	for {
-		img, err := client.obstructionMap(ctx)
+		obstructionMap, err := client.obstructionMap(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			c.setStatus(err.Error())
 		} else {
-			c.setImage(img)
+			combined, current := c.accumulate(session, obstructionMap)
+			if !current || ctx.Err() != nil {
+				return
+			}
+			c.setImages(
+				createImageFromSNR(obstructionMap.cols, obstructionMap.rows, obstructionMap.snr),
+				createImageFromSNR(combined.cols, combined.rows, combined.snr),
+			)
 			c.setStatus("Updated " + time.Now().Format(time.RFC3339))
 		}
 
@@ -202,12 +216,39 @@ func (c *controller) resetAtScheduledSeconds(ctx context.Context, client *grpcCl
 	}
 }
 
-func (c *controller) runFailed(ctx context.Context, err error) {
+func (c *controller) accumulate(session uint64, current obstructionMap) (obstructionMap, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.session != session || !c.running {
+		return obstructionMap{}, false
+	}
+	if c.combined.cols != current.cols || c.combined.rows != current.rows {
+		c.combined = obstructionMap{
+			cols: current.cols,
+			rows: current.rows,
+			snr:  make([]float32, current.cols*current.rows),
+		}
+		for i := range c.combined.snr {
+			c.combined.snr[i] = -1
+		}
+	}
+	for i, value := range current.snr[:current.cols*current.rows] {
+		if value >= 0 && (c.combined.snr[i] < 0 || value < c.combined.snr[i]) {
+			c.combined.snr[i] = value
+		}
+	}
+
+	result := c.combined
+	result.snr = append([]float32(nil), c.combined.snr...)
+	return result, true
+}
+
+func (c *controller) runFailed(ctx context.Context, session uint64, err error) {
 	if ctx.Err() != nil {
 		return
 	}
 	c.mu.Lock()
-	if c.cancel != nil {
+	if c.session == session && c.cancel != nil {
 		c.running = false
 		c.cancel = nil
 	}
@@ -224,11 +265,28 @@ func (c *controller) setStatus(status string) {
 	})
 }
 
-func (c *controller) setImage(img image.Image) {
+func (c *controller) setImages(current, accumulated image.Image) {
 	fyne.Do(func() {
-		c.image.Image = img
-		c.image.Refresh()
+		c.currentImage.Image = current
+		c.currentImage.Refresh()
+		c.accumulatedImage.Image = accumulated
+		c.accumulatedImage.Refresh()
 	})
+}
+
+func (c *controller) clearAccumulatedImage() {
+	fyne.Do(func() {
+		c.accumulatedImage.Image = newBlankImage()
+		c.accumulatedImage.Refresh()
+	})
+}
+
+func newBlankImage() image.Image {
+	data := make([]float32, 320*240)
+	for i := range data {
+		data[i] = -1
+	}
+	return createImageFromSNR(320, 240, data)
 }
 
 func main() {
@@ -238,8 +296,10 @@ func main() {
 	gui := app.NewWithID("com.jinwei.starlink-lens.obstruction-map")
 	window := gui.NewWindow("Starlink Obstruction Map")
 
-	mapImage := canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 640, 480)))
-	mapImage.FillMode = canvas.ImageFillContain
+	currentImage := canvas.NewImageFromImage(newBlankImage())
+	currentImage.FillMode = canvas.ImageFillContain
+	accumulatedImage := canvas.NewImageFromImage(newBlankImage())
+	accumulatedImage.FillMode = canvas.ImageFillContain
 	status := widget.NewLabel("Starting...")
 	interval := widget.NewEntry()
 	interval.SetText("1")
@@ -247,10 +307,11 @@ func main() {
 	reset := widget.NewCheck("Reset at :12, :27, :42, :57", nil)
 
 	c := &controller{
-		address:  *address,
-		interval: interval.Text,
-		status:   status,
-		image:    mapImage,
+		address:          *address,
+		interval:         interval.Text,
+		status:           status,
+		currentImage:     currentImage,
+		accumulatedImage: accumulatedImage,
 	}
 	button := widget.NewButton("Stop", c.toggle)
 	c.button = button
@@ -264,8 +325,12 @@ func main() {
 		reset,
 		layout.NewSpacer(),
 	)
-	window.SetContent(container.NewBorder(controls, status, nil, nil, mapImage))
-	window.Resize(fyne.NewSize(800, 650))
+	figures := container.NewGridWithColumns(2,
+		container.NewBorder(widget.NewLabelWithStyle("Current", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, currentImage),
+		container.NewBorder(widget.NewLabelWithStyle("Accumulated (minimum SNR)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, accumulatedImage),
+	)
+	window.SetContent(container.NewBorder(controls, status, nil, nil, figures))
+	window.Resize(fyne.NewSize(1200, 650))
 	window.SetOnClosed(c.stop)
 	c.start()
 	window.ShowAndRun()

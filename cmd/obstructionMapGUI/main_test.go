@@ -50,3 +50,30 @@ func TestCreateImageFromSNR(t *testing.T) {
 		t.Fatalf("zero SNR pixel = %#v, want red", got)
 	}
 }
+
+func TestAccumulateUsesMinimumValidSNR(t *testing.T) {
+	c := &controller{running: true, session: 1}
+	first := obstructionMap{cols: 2, rows: 2, snr: []float32{-1, 0.8, 0.4, 0.2}}
+	second := obstructionMap{cols: 2, rows: 2, snr: []float32{0.9, -1, 0.6, 0.1}}
+
+	if _, current := c.accumulate(1, first); !current {
+		t.Fatal("first map was rejected")
+	}
+	got, current := c.accumulate(1, second)
+	if !current {
+		t.Fatal("second map was rejected")
+	}
+	want := []float32{0.9, 0.8, 0.4, 0.1}
+	for i := range want {
+		if got.snr[i] != want[i] {
+			t.Fatalf("accumulated SNR[%d] = %v, want %v", i, got.snr[i], want[i])
+		}
+	}
+}
+
+func TestAccumulateRejectsOldSession(t *testing.T) {
+	c := &controller{running: true, session: 2}
+	if _, current := c.accumulate(1, obstructionMap{cols: 1, rows: 1, snr: []float32{0.5}}); current {
+		t.Fatal("map from an old session was accepted")
+	}
+}
