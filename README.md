@@ -106,6 +106,20 @@ It saves the obstruction map in png format in the current directory with the nam
 
 ![](./static/obstruction-map-2025-03-20-00-24-53.png)
 
+### Live obstruction map GUI
+
+Run the GUI from the repository root:
+
+```bash
+go run ./cmd/obstructionMapGUI
+```
+
+It starts polling immediately. Use the interval field to change the delay between pulls, Start/Stop to control polling, and the reset checkbox to clear the obstruction map at seconds 12, 27, 42, and 57 of every minute. A custom dish address can be supplied with `-addr_port`:
+
+```bash
+go run ./cmd/obstructionMapGUI -addr_port 192.168.100.1:9200
+```
+
 ### SINR Measurement
 
 This firmware feature has been removed by Starlink.
