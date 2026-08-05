@@ -26,7 +26,7 @@ func ICMPPing(target string, interval float64) {
 	filename := fmt.Sprintf("ping-%s-%s-%s-%s-%s.txt", PoP, target, Interval, Duration, datetimeString())
 	fullFilename := path.Join("data", today, filename)
 
-	cmd := exec.Command(PingBinary, "-D", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
+	cmd := exec.Command(PingBinary, "-D", "-O", "-c", strconv.Itoa(Count), "-i", fmt.Sprintf("%.2f", interval), "-I", Iface, target)
 	log.Info().Msgf("ping command: %s", cmd.String())
 
 	f, err := os.Create(fullFilename)
