@@ -325,9 +325,16 @@ func main() {
 		reset,
 		layout.NewSpacer(),
 	)
-	figures := container.NewGridWithColumns(2,
-		container.NewBorder(widget.NewLabelWithStyle("Current", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, currentImage),
-		container.NewBorder(widget.NewLabelWithStyle("Accumulated (minimum SNR)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, accumulatedImage),
+	figures := container.NewGridWithColumns(
+		2,
+		container.NewBorder(
+			widget.NewLabelWithStyle("Current",
+				fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+			nil, nil, nil, currentImage,
+		),
+		container.NewBorder(widget.NewLabelWithStyle("Accumulated (minimum SNR)",
+			fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+			nil, nil, nil, accumulatedImage),
 	)
 	window.SetContent(container.NewBorder(controls, status, nil, nil, figures))
 	window.Resize(fyne.NewSize(1200, 650))
