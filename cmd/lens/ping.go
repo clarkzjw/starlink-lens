@@ -94,7 +94,7 @@ func ICMPPing(target string, interval float64) {
 	}
 
 	if EnableSwift {
-		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, SwiftTenant)
+		conn, err := NewSwiftConn()
 		if err != nil {
 			log.Error().Err(err).Msg("Error creating Swift client")
 			return
@@ -163,7 +163,7 @@ func IRTTPing() {
 	<-ctx.Done()
 
 	if EnableSwift {
-		conn, err := NewSwiftConn(SwiftUsername, SwiftAPIKey, SwiftAuthURL, SwiftDomain, SwiftTenant)
+		conn, err := NewSwiftConn()
 		if err != nil {
 			log.Error().Err(err).Msg("Error creating Swift client")
 			return
