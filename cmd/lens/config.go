@@ -43,13 +43,31 @@ var (
 	NotifyURL  string
 
 	EnableSwift    = false
-	SwiftUsername  string
-	SwiftAPIKey    string
 	SwiftAuthURL   string
-	SwiftDomain    string
-	SwiftTenant    string
 	SwiftContainer string
+	SwiftRegion    string // optional; empty = first endpoint in the catalog
+
+	// Swift auth, application credential (recommended for federated / SSO clouds).
+	// If both are set, this is used instead of username/password.
+	SwiftAppCredID     string
+	SwiftAppCredSecret string
+
+	// Swift auth, username/password (for non-federated clouds).
+	SwiftUsername string
+	SwiftAPIKey   string
+	SwiftDomain   string
+	SwiftTenant   string
 )
+
+// UseAppCredential reports whether application-credential auth is fully configured.
+func UseAppCredential() bool {
+	return SwiftAppCredID != "" && SwiftAppCredSecret != ""
+}
+
+// usePasswordAuth reports whether username/password auth is fully configured.
+func usePasswordAuth() bool {
+	return SwiftUsername != "" && SwiftAPIKey != "" && SwiftDomain != "" && SwiftTenant != ""
+}
 
 func getConfigFromEnv() error {
 	err := godotenv.Load()
@@ -83,12 +101,17 @@ func getConfigFromEnv() error {
 		PingBinary = "ping"
 	}
 	EnableSwift = os.Getenv("ENABLE_SWIFT") == "true"
+	SwiftAuthURL = os.Getenv("SWIFT_AUTHURL")
+	SwiftContainer = os.Getenv("SWIFT_CONTAINER")
+	SwiftRegion = os.Getenv("SWIFT_REGION")
+
+	SwiftAppCredID = os.Getenv("SWIFT_APPLICATION_CREDENTIAL_ID")
+	SwiftAppCredSecret = os.Getenv("SWIFT_APPLICATION_CREDENTIAL_SECRET")
+
 	SwiftUsername = os.Getenv("SWIFT_USERNAME")
 	SwiftAPIKey = os.Getenv("SWIFT_APIKEY")
-	SwiftAuthURL = os.Getenv("SWIFT_AUTHURL")
 	SwiftDomain = os.Getenv("SWIFT_DOMAIN")
 	SwiftTenant = os.Getenv("SWIFT_TENANT")
-	SwiftContainer = os.Getenv("SWIFT_CONTAINER")
 	return nil
 }
 
@@ -113,6 +136,9 @@ func LoadConfig() error {
 	}
 
 	if EnableSwift {
+		if err := validateSwiftConfig(); err != nil {
+			return err
+		}
 		if err := TestSwiftConnection(); err != nil {
 			return fmt.Errorf("swift connection test failed: %w", err)
 		}
