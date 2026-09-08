@@ -56,7 +56,7 @@ func (t *errorBodyLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxLoggedErrorBody))
 	if readErr != nil {
-		return resp, nil
+		return resp, readErr
 	}
 	// Put the consumed bytes back so the client still sees a complete body.
 	resp.Body = struct {
